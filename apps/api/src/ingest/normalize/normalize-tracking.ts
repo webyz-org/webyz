@@ -21,9 +21,9 @@ export const normalizeTracking = async (
   const uaInfo = parseUserAgent(clientInfo.userAgent);
   const hostname = extractHostname(payload.url, request);
 
-  // Bot traffic is dropped silently, mirroring normalize-kafka-tracking: a
-  // raw throw here became a 500 (and broke the GET pixel response), and a
-  // crawler is not a client that needs an error.
+  // Bot traffic is dropped silently: a raw throw here became a 500 (and
+  // broke the GET pixel response), and a crawler is not a client that needs
+  // an error.
   if (isBot(clientInfo.userAgent)) {
     return null;
   }

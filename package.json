@@ -9,15 +9,14 @@
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "typecheck": "turbo run typecheck",
-    "clean": "turbo run clean && rimraf node_modules"
+    "clean": "turbo run clean && rm -rf node_modules"
   },
   "packageManager": "pnpm@10.28.2",
   "engines": {
     "node": ">=22"
   },
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "apps/*"
   ],
   "devDependencies": {
     "turbo": "^2.5.5",

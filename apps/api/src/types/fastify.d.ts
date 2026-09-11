@@ -18,7 +18,6 @@ declare module "fastify" {
     invalidateSiteCache: (siteId: string) => Promise<void>;
     prisma: PrismaClient;
     redis: RedisType;
-    kafkaProducer?: any;
     clickhouse: ReturnType<typeof createClient>;
   }
   interface FastifyRequest {

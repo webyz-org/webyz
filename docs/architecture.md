@@ -19,8 +19,6 @@ marketing (Next.js) ──▶ /api/v1/plans
 4. Identity is cookieless. `visitor_id = sha256(daily_salt + site + ip + user_agent)`; the salt is random per UTC day and kept in Redis for 48 hours. The session id lives in Redis under a 30 minute sliding TTL per visitor. A person is one visitor within a day and unlinkable across days; the IP is never stored.
 5. The event row is inserted, the realtime channel is notified, and for pageviews the session row is upserted.
 
-Kafka is optional and off by default. When enabled the API produces to a topic and a separate worker process consumes it with the same normalisation.
-
 ## Storage
 
 **ClickHouse** (`webyz_analytics`) holds the firehose. `events` is a MergeTree partitioned by month. `sessions` is a ReplacingMergeTree keyed by site and session, versioned by `updated_at`: extending a session means re-inserting the whole row, so every query deduplicates with `FINAL` or `argMax`. Almost every dashboard number comes from `sessions`, not `events`. Attribution (channel, referrer, UTM) is first-touch, fixed when the session is created. `hourly_aggregates` is an AggregatingMergeTree fed by a materialised view.
@@ -49,6 +47,6 @@ The dashboard is a Vite React SPA with feature folders. It reads entitlements on
 
 ## Deployment
 
-Three images built from the repo root so pnpm sees the workspace lockfile. The API image also serves as the migration runner and the Kafka worker by command. Compose runs a one-shot migrate before the API and joins the web-facing containers to a proxy network; Caddy or your own nginx terminates TLS. See [self-hosting.md](self-hosting.md).
+Three images built from the repo root so pnpm sees the workspace lockfile. The API image also serves as the migration runner by command. Compose runs a one-shot migrate before the API and joins the web-facing containers to a proxy network; Caddy or your own nginx terminates TLS. See [self-hosting.md](self-hosting.md).
 
 For the reasoning behind specific decisions, `CLAUDE.md` at the repo root goes deeper than this page and is kept in step with the code.

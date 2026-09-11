@@ -37,7 +37,7 @@ Most sites need one page of numbers: how many people came, from where, what they
 - **Overview** of visitors, visits, pageviews, views per visit, bounce rate and visit duration, each compared with the previous period, with a graph at minute, hour, day, week or month resolution.
 - **Breakdowns** by page, entry and exit page, channel, source, UTM parameters, browser, OS, device, screen size, language, country, region and city. Click a row to drill down (browser to versions, country to regions to cities); every filter lives in the URL so a view is a link.
 - **Filters** with `is`, `is not`, `contains` and `does not contain`, on any dimension plus goals and custom events. Save a set as a **segment** and apply it in one click.
-- **Realtime**: who is on the site right now, what they are looking at, and a live stream of activity.
+- **Realtime**: who is on the site right now on a world map, what they are looking at, and a live stream of activity.
 - **Goals, funnels and custom events** from event names or page paths, analysed live in ClickHouse. Custom event **properties** are broken down per value, so "Signup by plan" is two clicks.
 - **Automatic events** from the tracker: outbound link clicks, file downloads and 404 pages, each switched on by one attribute. Single-page apps and hash-based routers are followed without code.
 - **User journeys**: the paths visitors take between pages, with the events they fire along the way.

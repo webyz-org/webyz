@@ -1,6 +1,5 @@
 packages:
   - apps/*
-  - packages/*
 
 # Packages allowed to run install scripts. sharp powers next/image
 # optimisation, unrs-resolver backs eslint's module resolution, and

@@ -39,13 +39,6 @@ export const CLICKHOUSE_DB = process.env.CLICKHOUSE_DB || "webyz_analytics";
 export const REDIS_HOST = process.env.REDIS_HOST || "127.0.0.1";
 export const REDIS_PORT = Number(process.env.REDIS_PORT || 6379);
 
-export const KAFKA_ENABLED = bool(process.env.KAFKA_ENABLED, false);
-export const KAFKA_BROKERS = (process.env.KAFKA_BROKERS || "")
-  .split(",")
-  .map((b) => b.trim())
-  .filter(Boolean);
-export const KAFKA_TRACK_TOPIC = process.env.KAFKA_TOPIC || "tracking-events";
-
 export const MAXMIND_LICENSE_KEY = process.env.MAXMIND_LICENSE_KEY ?? "";
 
 // Where the dashboard SPA lives. Used for OAuth redirects and checkout returns.

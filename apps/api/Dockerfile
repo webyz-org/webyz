@@ -4,7 +4,6 @@
 # One image serves three roles, selected by the command:
 #   default            node dist/server.js              the API
 #   migrate            sh scripts/migrate-deploy.sh     Postgres + ClickHouse migrations, plan seed
-#   worker             node dist/worker.js              Kafka consumer (only if KAFKA_ENABLED)
 #
 # No package manager in the runtime image: the migrate role calls the prisma
 # and tsx binaries from node_modules/.bin directly.

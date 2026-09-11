@@ -81,14 +81,6 @@ Self-hosters normally leave Paddle empty. See [self-hosting.md](self-hosting.md)
 | --- | --- |
 | `MAXMIND_LICENSE_KEY` | Free GeoLite2 key. The weekly `update-geo` job (first run five minutes after start) downloads `GeoLite2-City.mmdb` into `apps/api/geo/` (a volume in Docker). Without it, country, region and city stay empty |
 
-### Kafka (optional, off by default)
-
-| Variable | Default | Notes |
-| --- | --- | --- |
-| `KAFKA_ENABLED` | `false` | When `true`, ingest produces to Kafka and a separate worker (`node dist/worker.js` with `WORKER_TYPE=tracking`) writes to ClickHouse |
-| `KAFKA_BROKERS` | empty | Comma separated |
-| `KAFKA_TOPIC` | `tracking-events` | |
-
 ## Dashboard (`apps/app`)
 
 Nothing is required. A self-hosted install serves the dashboard and the API from one domain, so the dashboard uses its own origin for the API at runtime, which is what lets the prebuilt image work for any domain. In `pnpm dev` both variables default to the local ports.

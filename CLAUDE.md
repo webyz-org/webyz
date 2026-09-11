@@ -12,13 +12,10 @@ pnpm workspaces + Turborepo. Node >= 22, pnpm 10.
 
 | Path | Name in package.json | What it is | Dev port |
 | --- | --- | --- | --- |
-| `apps/api` | `backend` | Fastify 5 API, tracker ingest, ClickHouse queries, Prisma, cron jobs, Kafka worker | 3042 |
+| `apps/api` | `backend` | Fastify 5 API, tracker ingest, ClickHouse queries, Prisma, cron jobs | 3042 |
 | `apps/app` | `app` | Vite + React 19 dashboard (SPA), TanStack Query, shadcn/Tailwind 4 | 3041 |
 | `apps/web` | `my-app` | Next.js 16 marketing site + auth pages | 3040 |
-| `apps/worker` | - | empty directory | - |
-| `packages/config`, `packages/ui`, `packages/utils` | - | empty directories, not real workspace packages yet | - |
 | `examples/tracker` | - | static HTML pages that load the tracker for manual testing | - |
-| `api.bruno` | - | Bruno API collection (one request so far) | - |
 
 All four apps are members of the single root pnpm workspace. `apps/web` used to carry its own `pnpm-workspace.yaml` and lockfile, which made it a competing workspace root; both are gone, so install from the repo root.
 
@@ -43,7 +40,6 @@ Per app, run from the app directory:
 pnpm dev                        # tsx watch src/server.ts
 pnpm build                      # clears dist, then tsc -p tsconfig.build.json
 pnpm start:prod
-pnpm worker:tracking            # builds, then runs the Kafka tracking consumer
 pnpm prisma:generate            # regenerates into src/generated/prisma
 pnpm prisma:migrate             # prisma migrate dev
 pnpm clickhouse:migrate         # applies clickhouse/migrations/*.sql in filename order
@@ -66,7 +62,7 @@ docker compose up -d            # postgres 5442, clickhouse 8123/9010, redis 638
 
 Host ports are deliberately non-default because 5432, 6379 and 9000 are commonly taken by other projects; keep `apps/api/.env` in sync with them (see `apps/api/.env.example`).
 
-Kafka is optional and off by default: ingest writes to ClickHouse inline. It is not in the compose file.
+Ingest writes to ClickHouse inline in the request; there is no queue. A Kafka path existed and was removed as dead code: a hard-coded constant kept it off and nothing shipped it.
 
 Tests use Node's built-in runner, no framework dependency: `pnpm test` in
 `apps/api` runs `node --import tsx --test "src/**/*.test.ts"`. Tests sit next to
@@ -290,13 +286,11 @@ Notifications (`core/notifications/`, `routes/v1/notifications.ts`): `EmailRepor
 2. It is cookieless and stores nothing in the browser (the only exception is the `webyz-disabled` localStorage flag written by `webyz.optOut()`). It sends a short-key payload: `t` (pageview|event), `sid` (website id), `pid` (in-memory pageview id), `url`, `ref`, `title`, `lang`, `screen`, plus custom props. The event time is the server's receive time, never a client value: `ts` is still accepted from old scripts and ignored (`ingest/normalize/timestamp.ts`), because usage is billed by the hour an event carries and a client must not be able to place events in a closed period, past the retention cut or in the future. Visitor and session identity are derived on the server by `src/ingest/identity/visitor-identity.ts`: `user_id = sha256(daily_salt + website_id + ip + user_agent)` with a random salt per UTC day kept in Redis for 48 hours, and `session_id` from a Redis key per visitor with a 30 minute sliding TTL. The same person is therefore one visitor within a day and unlinkable across days, a session never crosses UTC midnight, and the IP is never written anywhere. Old cached scripts may still send `vid`/`ssid`/`new_session`; they are accepted and ignored. If Redis is down, identity falls back to deterministic per-day and per-30-minute values so ingest never stops. The marketing site and the privacy policy (`apps/web/src/app/privacy`) describe this exactly; change them together.
 3. `POST /api/v1/track` returns 204 on success; `GET /api/v1/track` always returns a 1x1 GIF (pixel fallback). Both run `checkIngestAllowed` then `publishTracking`. An unknown site id is a 404 so a bad install is visible; an over-quota site gets 202 with nothing written, because a visitor's browser is the wrong place to surface a billing problem.
 Both routes carry `schemas/tracking.schema.ts`, validated by the tracker plugin's own Ajv (`removeAdditional: false`, unlike the app-wide validator, so custom event properties survive as extra keys and are bounded by `additionalProperties`; the POST body limit is 16 KB). A malformed POST is a 400; the GET attaches the validation error and still returns the pixel. `checkIngestAllowed` fails open only on connectivity errors (`core/tracker/connectivity.ts`: Prisma init and P1xxx errors, socket codes, pg terminated/timeout messages); anything else is rethrown so a bug can never switch quotas off. `normalizeMeta` keeps at most 30 custom properties of 500 characters.
-4. `publishTracking` (`src/ingest/http/publish-tracking.ts`) either produces to Kafka or, in the same request, normalizes and writes straight to ClickHouse. Kafka is off unless `KAFKA_ENABLED=true`. Note `src/plugins/external/kafka.ts` still has a local `const KAFKA_ENABLED = false` shadowing the env flag; remove it when you actually want Kafka.
-5. Normalization (`src/ingest/normalize/normalize-tracking.ts`) does bot rejection, visitor identity (above), hostname extraction, URL/UTM/meta parsing, user-agent parsing, and MaxMind geo lookup. `normalize-kafka-tracking.ts` is the equivalent for the worker, which reconstructs client info from the headers the producer forwarded and takes `{ redis }` for identity.
+4. `publishTracking` (`src/ingest/http/publish-tracking.ts`) normalizes and writes straight to ClickHouse in the same request.
+5. Normalization (`src/ingest/normalize/normalize-tracking.ts`) does bot rejection, visitor identity (above), hostname extraction, URL/UTM/meta parsing, user-agent parsing, and MaxMind geo lookup.
 6. `core/tracker/tracking.service.ts` inserts the event, then for pageviews upserts the session row.
 
 `core/tracker/session.service.ts` is the only writer of `sessions`. Because that table is a ReplacingMergeTree, "updating" a session re-inserts the whole row with a newer `updated_at`, so **every column must be carried forward explicitly or it is lost on the next pageview**. Attribution (`channel`, `referrer_domain`, `utm_*`) is first touch: computed by `ingest/helpers/channel.ts` when the session is created, then preserved.
-
-The Kafka consumer runs as a separate process: `src/worker.ts` dispatches on `WORKER_TYPE` (only `tracking` exists) into `src/workers/tracking.worker.ts`.
 
 Geo data lives in `apps/api/geo/`. `core/geo/geo-loader.service.ts` opens `geo/GeoLite2-City.mmdb` lazily and logs a failure without throwing, so geo silently degrades to empty fields if the DB is missing. `scripts/update-geo.ts` refreshes it with `MAXMIND_LICENSE_KEY`.
 
@@ -440,9 +434,9 @@ sitemap and canonical URLs. First deployed
 
 ## Environment variables
 
-`apps/api/.env` (loaded by `dotenv` in `src/config/env.ts`): `PORT`, `NODE_ENV`, `LOG_LEVEL`, `TRUST_PROXY`, `DATABASE_URL`, `CLICKHOUSE_HOST`, `CLICKHOUSE_URL`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `KAFKA_ENABLED`, `KAFKA_BROKERS`, `KAFKA_TOPIC`, `MAXMIND_LICENSE_KEY`, `FRONTEND_URL`, `APP_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `PADDLE_API_KEY`, `PADDLE_CLIENT_TOKEN`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_ENVIRONMENT`, `PADDLE_IP_ALLOWLIST`.
+`apps/api/.env` (loaded by `dotenv` in `src/config/env.ts`): `PORT`, `NODE_ENV`, `LOG_LEVEL`, `TRUST_PROXY`, `DATABASE_URL`, `CLICKHOUSE_HOST`, `CLICKHOUSE_URL`, `CLICKHOUSE_USER`, `CLICKHOUSE_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `MAXMIND_LICENSE_KEY`, `FRONTEND_URL`, `APP_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `PADDLE_API_KEY`, `PADDLE_CLIENT_TOKEN`, `PADDLE_WEBHOOK_SECRET`, `PADDLE_ENVIRONMENT`, `PADDLE_IP_ALLOWLIST`.
 
-`TRUST_PROXY` decides which upstream hops may set the client address (`config/trust-proxy.ts`): a hop count such as `1` for one load balancer or reverse proxy, a comma list of addresses or CIDRs, or `false` for direct connections. It is required in production (the server refuses to boot without it) and defaults to `false` in development. Every consumer of the client address (rate-limit keys, session IP records, geo, the visitor hash, the Kafka message) reads `request.ip`, which Fastify resolves under this setting; nothing parses `X-Forwarded-For` by hand. It was `trustProxy: true` before, which believes the leftmost forwarded value and let any client forge its address.
+`TRUST_PROXY` decides which upstream hops may set the client address (`config/trust-proxy.ts`): a hop count such as `1` for one load balancer or reverse proxy, a comma list of addresses or CIDRs, or `false` for direct connections. It is required in production (the server refuses to boot without it) and defaults to `false` in development. Every consumer of the client address (rate-limit keys, session IP records, geo, the visitor hash) reads `request.ip`, which Fastify resolves under this setting; nothing parses `X-Forwarded-For` by hand. It was `trustProxy: true` before, which believes the leftmost forwarded value and let any client forge its address.
 
 `CLICKHOUSE_URL` is the single setting; `CLICKHOUSE_HOST` is still accepted as a legacy alias by `config/env.ts`. Add `CORS_ORIGINS` to allow extra front end origins, otherwise it defaults to `FRONTEND_URL` plus `MARKETING_URL`.
 

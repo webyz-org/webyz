@@ -27,10 +27,6 @@
     "dev": {
       "cache": false,
       "persistent": true
-    },
-    "worker:tracking": {
-      "cache": false,
-      "persistent": true
     }
   }
 }

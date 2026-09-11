@@ -198,8 +198,12 @@ test("funnels: the write paths are gated too, not only the list", { skip }, asyn
 
 test("funnels: unauthenticated is 401, and an entitled user still cannot reach another owner's site", { skip }, async () => {
   assert.equal((await call("GET", `/api/v1/websites/${accounts.growth.siteId}/funnels`, null)).status, 401);
+  // authorizeSite runs before the plan check so the owner's plan decides; a
+  // caller who is neither owner nor member is refused there, with the same
+  // answer every other site-scoped route gives, before any plan is consulted.
   const other = await call("GET", `/api/v1/websites/${accounts.free.siteId}/funnels`, accounts.growth);
-  assert.equal(other.status, 404, "ownership check after the plan check is unchanged");
+  assert.equal(other.status, 403, JSON.stringify(other.body));
+  assert.equal(other.body.error.code, "SITE_ACCESS_DENIED");
 });
 
 // ─── Journeys ────────────────────────────────────────────────────────────────
