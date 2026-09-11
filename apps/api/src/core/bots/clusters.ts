@@ -20,18 +20,21 @@ import type { Redis } from "ioredis";
  * flagged group of their site. Nothing already written is removed: the
  * filter is forward-looking, like the others.
  *
- * Two guards keep it honest. A site is only examined once a fifth of its
- * sessions in the window carry engagement, which proves the deployed
- * tracker sends it: a site on an older cached script has no engagement
- * anywhere and would otherwise look entirely scripted. And the thresholds
- * are absolute, so a small site's whole audience can never form a "cluster".
+ * Two guards keep it honest. A site is only examined once enough of its
+ * sessions in the window carry engagement (an absolute count, not a share:
+ * on the first site this ran against, scripted sessions were 45% of the
+ * hour and a share test could never have passed, since the bots are in the
+ * denominator). The count proves the deployed tracker sends engagement; a
+ * site on an older cached script has none anywhere and would otherwise look
+ * entirely scripted. And the cluster thresholds are absolute too, so a small
+ * site's whole audience can never form a "cluster".
  */
 export const CLUSTER_WINDOW_MINUTES = 60;
 export const CLUSTER_FLAG_TTL_SECONDS = 24 * 3600;
 export const CLUSTER_MIN_VISITS = 50;
 export const CLUSTER_MIN_VISITORS = 20;
 export const CLUSTER_MIN_BOUNCE_SHARE = 0.95;
-export const SITE_MIN_ENGAGED_SHARE = 0.2;
+export const SITE_MIN_ENGAGED_SESSIONS = 30;
 
 export type ClusterRow = {
   website_id: string;
@@ -71,7 +74,7 @@ export const findClusterCandidates = async (clickhouse: ClickHouseClient): Promi
         FROM sessions FINAL
         WHERE start_time >= now() - INTERVAL {window:UInt32} MINUTE
         GROUP BY website_id
-        HAVING countIf(engaged_seconds > 0) >= count() * {engagedShare:Float64}
+        HAVING countIf(engaged_seconds > 0) >= {minEngaged:UInt32}
       )
       SELECT
         website_id,
@@ -90,7 +93,7 @@ export const findClusterCandidates = async (clickhouse: ClickHouseClient): Promi
     `,
     query_params: {
       window: CLUSTER_WINDOW_MINUTES,
-      engagedShare: SITE_MIN_ENGAGED_SHARE,
+      minEngaged: SITE_MIN_ENGAGED_SESSIONS,
       minVisits: CLUSTER_MIN_VISITS,
       minVisitors: CLUSTER_MIN_VISITORS,
     },

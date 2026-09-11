@@ -1,4 +1,4 @@
-import { updateSession } from "./session.service.js";
+import { touchSessionForEvent, updateSession } from "./session.service.js";
 import { recordEngagement } from "./engagement.service.js";
 import { withSessionLock, type LockRedis } from "./session-lock.js";
 import { EventInput, SessionUAInfo } from "./types.js";
@@ -40,11 +40,13 @@ export const track = async (
 
   // Update session if it's pageview
   // Serialised per session: see session-lock.ts for the race it prevents.
-  if (input.isPageView) {
-    await withSessionLock(deps.redis, event.websiteId, event.sessionId, () =>
-      updateSession(deps.clickhouse, event, input.newSession, input.uaInfo),
-    );
-  }
+  // A custom event also touches the session: it ends the bounce and extends
+  // the visit, as in Plausible and Umami (session.service.ts).
+  await withSessionLock(deps.redis, event.websiteId, event.sessionId, () =>
+    input.isPageView
+      ? updateSession(deps.clickhouse, event, input.newSession, input.uaInfo)
+      : touchSessionForEvent(deps.clickhouse, event).then(() => undefined),
+  );
 };
 
 export type IngestResult =

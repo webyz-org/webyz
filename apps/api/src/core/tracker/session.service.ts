@@ -3,7 +3,79 @@ import { ClickHouseClient } from "@clickhouse/client";
 import { toUnixSeconds } from "../../utils/time.js";
 import { EventData, SessionData, SessionUAInfo } from "../../core/tracker/types.js";
 import { getSession, upsertSession } from "../../db/clickhouse/session.js";
+import type { SessionRow } from "../../db/clickhouse/types.js";
 import { classifyChannel } from "../../ingest/helpers/channel.js";
+
+/**
+ * Apply a custom event to its session (pure, so it is testable).
+ *
+ * A custom event is an interaction, so the visit it belongs to is no longer a
+ * bounce and lasts at least until the event. Plausible clears `is_bounce` on
+ * any interactive non-pageview event and sets duration to the event's time;
+ * Umami counts a bounce only when a visit has one pageview and no custom
+ * event. Here the session's `events` counter (pageviews plus custom events)
+ * carries that: a bounce is a session with `events = 1`. Rows from before
+ * custom events touched the session have `events = page_views`, so the
+ * definition is unchanged for them.
+ */
+export const applyCustomEvent = (row: SessionData, eventTime: number): SessionData => {
+  const endTime = Math.max(row.endTime, eventTime);
+  return {
+    ...row,
+    endTime,
+    durationSeconds: Math.max(0, endTime - row.startTime),
+    events: row.events + 1,
+  };
+};
+
+/** The full row as the domain type; every column, so a re-insert loses nothing. */
+export const sessionRowToData = (existing: SessionRow): SessionData => ({
+  sessionId: existing.session_id,
+  websiteId: existing.website_id,
+  userId: existing.user_id,
+  startTime: existing.start_time,
+  endTime: existing.end_time,
+  durationSeconds: Number(existing.duration_seconds),
+  entryPage: existing.entry_page,
+  exitPage: existing.exit_page,
+  pageViews: Number(existing.page_views),
+  events: Number(existing.events),
+  engagedSeconds: Number(existing.engaged_seconds ?? 0),
+  scrollDepth: Number(existing.scroll_depth ?? 0),
+  hostname: existing.hostname,
+  browserFamily: existing.browser_family,
+  browserVersion: existing.browser_version,
+  osFamily: existing.os_family,
+  osVersion: existing.os_version,
+  deviceType: existing.device_type,
+  deviceBrand: existing.device_brand,
+  screen: existing.screen ?? "",
+  language: existing.language ?? "",
+  country: existing.country,
+  subdivision1: existing.sub_division_1 ?? "",
+  subdivision2: existing.sub_division_2 ?? "",
+  city: existing.city,
+  channel: existing.channel ?? "",
+  referrerDomain: existing.referrer_domain ?? "",
+  utmSource: existing.utm_source ?? "",
+  utmMedium: existing.utm_medium ?? "",
+  utmCampaign: existing.utm_campaign ?? "",
+  utmContent: existing.utm_content ?? "",
+  utmTerm: existing.utm_term ?? "",
+});
+
+/**
+ * Record a custom event against its session. Without a session (the event
+ * arrived before its pageview, or that pageview was filtered) nothing is
+ * written here: the event row itself is already stored, and a session is
+ * only ever created by a pageview so views per visit stays meaningful.
+ */
+export const touchSessionForEvent = async (clickhouse: ClickHouseClient, event: EventData): Promise<boolean> => {
+  const existing = await getSession(clickhouse, event.websiteId, event.sessionId);
+  if (!existing) return false;
+  await upsertSession(clickhouse, applyCustomEvent(sessionRowToData(existing), toUnixSeconds(event.timestamp)));
+  return true;
+};
 
 /**
  * Write or extend the session row for a pageview.

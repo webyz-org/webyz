@@ -3,6 +3,7 @@ import { ClickHouseClient } from "@clickhouse/client";
 import { toUnixSeconds } from "../../utils/time.js";
 import { EventData, SessionData } from "./types.js";
 import { getSession, upsertSession } from "../../db/clickhouse/session.js";
+import { sessionRowToData } from "./session.service.js";
 import { insertEngagement } from "../../db/clickhouse/engagement.js";
 
 export type Engagement = { ms: number; scrollDepth: number };
@@ -48,40 +49,7 @@ export const recordEngagement = async (
   const existing = await getSession(clickhouse, event.websiteId, event.sessionId);
   if (!existing) return false;
 
-  const row: SessionData = {
-    sessionId: existing.session_id,
-    websiteId: existing.website_id,
-    userId: existing.user_id,
-    startTime: existing.start_time,
-    endTime: existing.end_time,
-    durationSeconds: Number(existing.duration_seconds),
-    entryPage: existing.entry_page,
-    exitPage: existing.exit_page,
-    pageViews: Number(existing.page_views),
-    events: Number(existing.events),
-    engagedSeconds: Number(existing.engaged_seconds ?? 0),
-    scrollDepth: Number(existing.scroll_depth ?? 0),
-    hostname: existing.hostname,
-    browserFamily: existing.browser_family,
-    browserVersion: existing.browser_version,
-    osFamily: existing.os_family,
-    osVersion: existing.os_version,
-    deviceType: existing.device_type,
-    deviceBrand: existing.device_brand,
-    screen: existing.screen ?? "",
-    language: existing.language ?? "",
-    country: existing.country,
-    subdivision1: existing.sub_division_1 ?? "",
-    subdivision2: existing.sub_division_2 ?? "",
-    city: existing.city,
-    channel: existing.channel ?? "",
-    referrerDomain: existing.referrer_domain ?? "",
-    utmSource: existing.utm_source ?? "",
-    utmMedium: existing.utm_medium ?? "",
-    utmCampaign: existing.utm_campaign ?? "",
-    utmContent: existing.utm_content ?? "",
-    utmTerm: existing.utm_term ?? "",
-  };
+  const row = sessionRowToData(existing);
 
   const reportedAt = toUnixSeconds(event.timestamp);
   await upsertSession(clickhouse, applyEngagement(row, engagement, reportedAt));

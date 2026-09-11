@@ -44,6 +44,7 @@ export const topStatsQuery = async (
             session_id,
             argMax(user_id, updated_at) AS user_id,
             argMax(page_views, updated_at) AS page_views,
+            argMax(events, updated_at) AS events,
             argMax(duration_seconds, updated_at) AS duration_seconds${dedupColumns ? `,\n          ${dedupColumns}` : ""}
           FROM webyz_analytics.sessions
           WHERE website_id = {websiteId:String}
@@ -69,7 +70,7 @@ export const topStatsQuery = async (
           count() AS visits,
           sum(page_views) AS pageviews,
           avg(duration_seconds) AS visit_duration,
-          sumIf(1, page_views = 1) AS bounces
+          sumIf(1, events = 1) AS bounces
         FROM current_sessions
       ),
 
@@ -79,7 +80,7 @@ export const topStatsQuery = async (
           count() AS visits,
           sum(page_views) AS pageviews,
           avg(duration_seconds) AS visit_duration,
-          sumIf(1, page_views = 1) AS bounces
+          sumIf(1, events = 1) AS bounces
         FROM comparison_sessions
       )
 

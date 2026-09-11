@@ -16,7 +16,7 @@ const METRIC_SQL: Record<string, string> = {
   visits: "toUInt32(count())",
   pageviews: "toUInt32(sum(page_views))",
   views_per_visit: "round(sum(page_views) / greatest(count(), 1), 2)",
-  bounce_rate: "round(countIf(page_views = 1) / greatest(count(), 1) * 100, 2)",
+  bounce_rate: "round(countIf(events = 1) / greatest(count(), 1) * 100, 2)",
   visit_duration: "toUInt32(round(avg(duration_seconds)))",
 };
 
@@ -73,6 +73,7 @@ export const timeseriesQuery = async (
             session_id,
             argMax(user_id, updated_at) AS user_id,
             argMax(page_views, updated_at) AS page_views,
+            argMax(events, updated_at) AS events,
             argMax(duration_seconds, updated_at) AS duration_seconds,
             -- Aliasing this as start_time would shadow the column in WHERE
             -- above and ClickHouse rejects the query (ILLEGAL_AGGREGATION).

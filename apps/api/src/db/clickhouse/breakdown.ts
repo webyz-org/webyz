@@ -231,6 +231,7 @@ export const sessionBreakdown = async (
         session_id,
         argMax(user_id, updated_at) AS user_id,
         argMax(page_views, updated_at) AS page_views,
+        argMax(events, updated_at) AS events,
         argMax(duration_seconds, updated_at) AS duration_seconds,
         ${dedupColumns}
       FROM sessions
@@ -248,7 +249,7 @@ export const sessionBreakdown = async (
       toUInt32(uniqExact(user_id)) AS visitors,
       toUInt32(count()) AS visits,
       toUInt32(sum(page_views)) AS pageviews,
-      round(sum(page_views = 1) / count() * 100, 2) AS bounce_rate,
+      round(sum(events = 1) / count() * 100, 2) AS bounce_rate,
       toUInt32(round(avg(duration_seconds))) AS visit_duration,
       toUInt32((SELECT uniqExact(user_id) FROM filtered)) AS total_visitors,
       toUInt32((SELECT uniqExact(${spec.expr}) FROM filtered)) AS dimension_count
@@ -331,6 +332,7 @@ export const pageBreakdown = async (
         SELECT
           session_id,
           argMax(page_views, updated_at) AS page_views,
+          argMax(events, updated_at) AS events,
           argMax(duration_seconds, updated_at) AS duration_seconds,
           argMax(entry_page, updated_at) AS entry_page${dedupColumns ? `,\n          ${dedupColumns}` : ""}
         FROM sessions
@@ -356,7 +358,7 @@ export const pageBreakdown = async (
       toUInt32(uniqExact(p.user_id)) AS visitors,
       toUInt32(count()) AS pageviews,
       round(
-        countIf(s.page_views = 1 AND s.entry_page = p.url_path)
+        countIf(s.events = 1 AND s.entry_page = p.url_path)
           / greatest(uniqExact(p.session_id), 1) * 100,
         2
       ) AS bounce_rate,

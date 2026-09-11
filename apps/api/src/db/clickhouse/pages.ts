@@ -102,6 +102,7 @@ export const pagesListQuery = async (
       SELECT
         session_id,
         argMax(page_views, updated_at) AS page_views,
+        argMax(events, updated_at) AS events,
         argMax(duration_seconds, updated_at) AS duration_seconds,
         argMax(entry_page, updated_at) AS entry_page
       FROM sessions
@@ -117,7 +118,7 @@ export const pagesListQuery = async (
       toUInt32(uniqExact(p.session_id)) AS sessions,
       toUInt32(uniqExact(p.user_id)) AS visitors,
       round(
-        countIf(s.page_views = 1 AND s.entry_page = p.url_path)
+        countIf(s.events = 1 AND s.entry_page = p.url_path)
           / greatest(uniqExact(p.session_id), 1) * 100,
         2
       ) AS bounce_rate,
@@ -185,6 +186,7 @@ export const pagesSummaryQuery = async (
       SELECT
         session_id,
         argMax(page_views, updated_at) AS page_views,
+        argMax(events, updated_at) AS events,
         argMax(duration_seconds, updated_at) AS duration_seconds
       FROM sessions
       WHERE website_id = {websiteId:String}
@@ -197,7 +199,7 @@ export const pagesSummaryQuery = async (
       (SELECT toUInt32(count()) FROM pv) AS pageviews,
       (SELECT toUInt32(count()) FROM sess) AS sessions,
       (
-        SELECT round(countIf(page_views = 1) / greatest(count(), 1) * 100, 2)
+        SELECT round(countIf(events = 1) / greatest(count(), 1) * 100, 2)
         FROM sess
       ) AS bounce_rate,
       (
@@ -323,6 +325,7 @@ export const pageDetailStatsQuery = async (
       SELECT
         session_id,
         argMax(page_views, updated_at) AS page_views,
+        argMax(events, updated_at) AS events,
         argMax(duration_seconds, updated_at) AS duration_seconds,
         argMax(entry_page, updated_at) AS entry_page,
         argMax(exit_page, updated_at) AS exit_page
@@ -351,7 +354,7 @@ export const pageDetailStatsQuery = async (
       toUInt32(uniqExact(p.session_id)) AS sessions,
       toUInt32(uniqExact(p.user_id)) AS visitors,
       round(
-        countIf(s.page_views = 1 AND s.entry_page = {path:String})
+        countIf(s.events = 1 AND s.entry_page = {path:String})
           / greatest(uniqExact(p.session_id), 1) * 100,
         2
       ) AS bounce_rate,
