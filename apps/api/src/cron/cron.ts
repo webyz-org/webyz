@@ -1,12 +1,14 @@
 import type { FastifyInstance } from "fastify";
 
 import { redis } from "../lib/redis.js";
-import { BILLING_ENABLED, NODE_ENV } from "../config/env.js";
+import { BILLING_ENABLED, BOT_CLUSTER_FILTER, NODE_ENV } from "../config/env.js";
 import { syncUsageJob } from "./sync-usage.job.js";
 import { chargeOverageJob } from "./charge-overage.job.js";
 import { applyPlanChangesJob } from "./apply-plan-changes.job.js";
 import { enforceLimitsJob } from "./enforce-limits.job.js";
 import { updateGeoJob } from "./update-geo.job.js";
+import { updateBotListsJob } from "./update-bot-lists.job.js";
+import { detectScriptedTrafficJob } from "./detect-scripted-traffic.job.js";
 import { purgeTokensJob } from "./purge-tokens.job.js";
 import { trialsJob } from "./trials.job.js";
 import { emailReportsJob } from "./email-reports.job.js";
@@ -94,6 +96,26 @@ const jobs = (): Job[] => [
     delayMs: 5 * MINUTE,
     run: updateGeoJob,
     enabled: true,
+  },
+  {
+    // Data-centre ranges, the Private Relay carve-out and the referrer spam
+    // domains. The upstream lists are rebuilt regularly; daily keeps new
+    // cloud ranges out within a day. Until the first run the image's seed
+    // copies serve (core/bots/list-files.ts).
+    name: "update-bot-lists",
+    everyMs: DAY,
+    delayMs: MINUTE,
+    run: updateBotListsJob,
+    enabled: true,
+  },
+  {
+    // Behavioural bot detection over the last hour's sessions; flags live 24
+    // hours in Redis, so five minutes is often enough and cheap enough.
+    name: "detect-scripted-traffic",
+    everyMs: 5 * MINUTE,
+    delayMs: 3 * MINUTE,
+    run: detectScriptedTrafficJob,
+    enabled: BOT_CLUSTER_FILTER,
   },
   {
     // Weekly and monthly summary emails become due at 09:00 in each site's

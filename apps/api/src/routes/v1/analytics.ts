@@ -4,6 +4,7 @@ import {
   breakdownController,
   exportController,
   getConversionsController,
+  getFilteredTrafficController,
   getCustomEventPropertiesController,
   getCustomEventsController,
   getJourneysController,
@@ -38,6 +39,8 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
   fastify.get("/:siteId/pages/detail", guard, getPageDetailController);
 
   fastify.get("/:siteId/top-stats", guard, getTopStatsController);
+  // Requests the bot filters dropped, for the dashboard's "filtered traffic" line.
+  fastify.get("/:siteId/filtered-traffic", guard, getFilteredTrafficController);
   fastify.get("/:siteId/main-graph", guard, getMainGraphController);
   fastify.get("/:siteId/realtime", guard, getRealtimeController);
 

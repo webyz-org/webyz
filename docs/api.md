@@ -106,7 +106,8 @@ All under `/:siteId/`. Readable by the owner, any team member, or anyone when th
 
 | Path | Extra parameters | Returns |
 | --- | --- | --- |
-| `top-stats` | filters | Visitors, visits, pageviews, views per visit, bounce rate, visit duration, each with the previous period's value |
+| `top-stats` | filters | Visitors, visits, pageviews, views per visit, bounce rate, visit duration, each with the previous period's value. Visit duration runs from the first pageview to the last pageview or engagement report, so single-page visits count the time the page was visible |
+| `filtered-traffic` | | owner or member only: requests the bot filters refused in the period, `{ total, reasons: { bot_user_agent, datacenter_ip, referrer_spam, scripted_cluster } }` |
 | `main-graph` | `metric` (`visitors`, `visits`, `pageviews`, `views_per_visit`, `bounce_rate`, `visit_duration`), `interval` (`minute`, `hour`, `day`, `week`, `month`; widened automatically for long ranges), filters | `labels` and `plot` arrays |
 | `top-pages`, `entries`, `exits` | `detailed=true`, `limit`, `page`, filters | Breakdown rows: `name`, `visitors`, `percentage`, and with `detailed` also `visits`, `pageviews`, `bounce_rate`, `visit_duration` |
 | `browsers`, `browser-versions`, `os`, `os-versions`, `device-types`, `screen-sizes`, `languages` | same | Technology breakdowns (screen as `WxH`, language as a BCP 47 tag; both empty for sessions recorded before the columns existed) |

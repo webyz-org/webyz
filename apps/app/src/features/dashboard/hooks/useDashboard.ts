@@ -5,6 +5,7 @@ import {
   getConversions,
   getCustomEventProperties,
   getCustomEvents,
+  getFilteredTraffic,
   getJourneys,
   getMainGraph,
   getRealtime,
@@ -33,6 +34,14 @@ export const useTopStats = (scope: AnalyticsScope) =>
   useQuery({
     queryKey: [...scopeKey(scope), "top-stats"],
     queryFn: () => getTopStats(scope),
+    enabled: enabledFor(scope),
+  });
+
+export const useFilteredTraffic = (scope: AnalyticsScope) =>
+  useQuery({
+    // Keyed without the drill-down filters: drops have no dimensions to filter on.
+    queryKey: ["analytics", scope.siteId, scope.period, scope.from ?? null, scope.to ?? null, "filtered-traffic"],
+    queryFn: () => getFilteredTraffic(scope),
     enabled: enabledFor(scope),
   });
 

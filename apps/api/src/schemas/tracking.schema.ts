@@ -14,7 +14,7 @@ import { Static, Type } from "@sinclair/typebox";
  */
 export const trackingSchema = Type.Object(
   {
-    t: Type.Union([Type.Literal("pageview"), Type.Literal("event")]),
+    t: Type.Union([Type.Literal("pageview"), Type.Literal("event"), Type.Literal("engagement")]),
     sid: Type.String({ minLength: 1, maxLength: 100 }),
     vid: Type.Optional(Type.String({ maxLength: 100 })),
     ssid: Type.Optional(Type.String({ maxLength: 100 })),
@@ -29,6 +29,10 @@ export const trackingSchema = Type.Object(
     new_visitor: Type.Optional(Type.Union([Type.Literal(0), Type.Literal(1)])),
     new_session: Type.Optional(Type.Union([Type.Literal(0), Type.Literal(1)])),
     name: Type.Optional(Type.String({ maxLength: 100 })),
+    // Engagement only: visible milliseconds since the last report (a day at
+    // most, anything longer is a clock or a bot) and scroll depth in percent.
+    e: Type.Optional(Type.Number({ minimum: 0, maximum: 86_400_000 })),
+    sd: Type.Optional(Type.Number({ minimum: 0, maximum: 100 })),
   },
   {
     additionalProperties: Type.Union([Type.String({ maxLength: 500 }), Type.Number(), Type.Boolean()]),

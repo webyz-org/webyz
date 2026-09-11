@@ -28,6 +28,7 @@ import { subscribeRealtime } from "../core/realtime/hub.js";
 import { badRequest } from "../errors/http-errors.js";
 import { siteAccessDenied } from "../errors/domain-errors.js";
 import { CORS_ORIGINS } from "../config/env.js";
+import { countDrops } from "../core/bots/drops.js";
 import type { SessionDimension } from "../db/clickhouse/breakdown.js";
 import {
   FILTER_KEYS,
@@ -516,4 +517,15 @@ export const getCustomEventsController = async (
   });
 
   return sendResponse(reply, data.results, { meta: retentionMeta(range) });
+};
+
+/**
+ * What the ingest filters refused for this site in the period, by reason.
+ * Members only: a shared dashboard shows the audience, not the plumbing.
+ */
+export const getFilteredTrafficController = async (request: FastifyRequest, reply: FastifyReply) => {
+  requireSiteOwner(request);
+  const range = await resolveWindow(request);
+  const counts = await countDrops(request.ctx.clickhouse, request.website.id, range.from, range.to);
+  return sendResponse(reply, { from: range.from, to: range.to, ...counts });
 };

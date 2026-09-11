@@ -2,8 +2,10 @@ export type EventInput = {
   websiteId: string;
   sessionId: string;
   userId: string;
-  eventType: "pageview" | "event";
+  eventType: "pageview" | "event" | "engagement";
   eventName: string;
+  /** Only on engagement: visible time since the last report, deepest scroll so far. */
+  engagement?: { ms: number; scrollDepth: number };
   timestamp: Date;
   hostname: string;
   url: {
@@ -65,6 +67,10 @@ export type SessionData = {
   exitPage: string;
   pageViews: number;
   events: number;
+  // Visible time and deepest scroll reported by engagement events, summed
+  // and maxed over the session; carried forward like every other column.
+  engagedSeconds: number;
+  scrollDepth: number;
   hostname: string;
   browserFamily: string;
   browserVersion: string;

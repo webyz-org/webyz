@@ -1,4 +1,6 @@
 import { updateSession } from "./session.service.js";
+import { recordEngagement } from "./engagement.service.js";
+import { withSessionLock, type LockRedis } from "./session-lock.js";
 import { EventInput, SessionUAInfo } from "./types.js";
 import { ClickHouseClient } from "@clickhouse/client";
 import { mapEventInputToEventData } from "./event.service.js";
@@ -11,7 +13,7 @@ import { INGEST_HOSTNAME_CHECK } from "../../config/env.js";
 import { hostnameMatchesSite } from "../../utils/hostname.js";
 
 export const track = async (
-  deps: { clickhouse: ClickHouseClient },
+  deps: { clickhouse: ClickHouseClient; redis?: LockRedis },
   input: {
     input: EventInput;
     uaInfo: SessionUAInfo;
@@ -21,6 +23,15 @@ export const track = async (
 ) => {
   const event = mapEventInputToEventData(input.input);
 
+  // Engagement is not an event: it extends the session it belongs to and is
+  // kept in its own table, so it is neither billed nor counted as activity.
+  if (input.input.eventType === "engagement") {
+    await withSessionLock(deps.redis, event.websiteId, event.sessionId, () =>
+      recordEngagement(deps.clickhouse, event, input.input.engagement ?? { ms: 0, scrollDepth: 0 }),
+    );
+    return;
+  }
+
   // Store the event
   await insertEvent(deps.clickhouse, event);
 
@@ -28,8 +39,11 @@ export const track = async (
   publishRealtimeEvent(event);
 
   // Update session if it's pageview
+  // Serialised per session: see session-lock.ts for the race it prevents.
   if (input.isPageView) {
-    await updateSession(deps.clickhouse, event, input.newSession, input.uaInfo);
+    await withSessionLock(deps.redis, event.websiteId, event.sessionId, () =>
+      updateSession(deps.clickhouse, event, input.newSession, input.uaInfo),
+    );
   }
 };
 

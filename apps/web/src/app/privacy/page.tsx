@@ -60,6 +60,7 @@ export default function PrivacyPage() {
                 <li>the page URL and title, and the referring URL when the browser provides one;</li>
                 <li>the browser, operating system and device type, derived from the user agent string;</li>
                 <li>screen size and browser language;</li>
+                <li>how long the page was visible in the browser tab and how far down it was scrolled;</li>
                 <li>the country, region and city derived from the IP address (see below);</li>
                 <li>
                   custom events and their properties, when the website owner has chosen to send them. Owners are
@@ -91,7 +92,9 @@ export default function PrivacyPage() {
                 <strong>Do Not Track and opt-out.</strong> The script honours the browser&apos;s Do Not Track setting
                 by default and records nothing when it is on. Any visitor can also opt out of measurement on a given
                 site by calling the script&apos;s opt-out function from the browser console; the website owner may
-                expose this as a button. Known bots and crawlers are dropped before they are counted.
+                expose this as a button. Known bots and crawlers are dropped before they are counted, as are requests
+                from known data-centre and hosting address ranges, which is how scripted browsers reach a site; that
+                check also uses the IP address in memory only.
               </p>
               <p>
                 <strong>Legal basis and your rights.</strong> The website owner is responsible for the legal basis of

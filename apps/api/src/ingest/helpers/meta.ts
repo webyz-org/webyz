@@ -27,6 +27,8 @@ export const normalizeMeta = (
     "new_visitor",
     "new_session",
     "ts",
+    "e",
+    "sd",
   ]);
 
   for (const [key, value] of Object.entries(payload)) {

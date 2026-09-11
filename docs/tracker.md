@@ -32,7 +32,7 @@ All configuration is `data-*` attributes on the script tag.
 
 ## What is sent
 
-For each pageview or event: the page URL and title, the referrer, the browser language and screen size, a timestamp, and any custom properties you add. Nothing identifies the visitor: no cookie, no local storage, no fingerprint. The server derives a visitor id from a hash of the site, IP address, user agent and a salt that rotates every day, so a person is one visitor within a day and cannot be followed across days. The IP is used for that hash and for a country lookup on the server, then discarded. Details in the [privacy policy](../apps/web/src/app/privacy/page.tsx) the hosted service publishes.
+For each pageview or event: the page URL and title, the referrer, the browser language and screen size, a timestamp, and any custom properties you add. When a page is hidden, loses focus or is left, the script also sends an engagement report: how many milliseconds the page was actually visible since the last report and the deepest scroll position as a percentage. The server adds that time to the visit, so a one-page visit that was read for two minutes is a two minute visit rather than 0 s, and stores the report per page for time-on-page and scroll depth. Engagement reports are not events: they are not billed and do not appear as activity. Nothing identifies the visitor: no cookie, no local storage, no fingerprint. The server derives a visitor id from a hash of the site, IP address, user agent and a salt that rotates every day, so a person is one visitor within a day and cannot be followed across days. The IP is used for that hash and for a country lookup on the server, then discarded. Details in the [privacy policy](../apps/web/src/app/privacy/page.tsx) the hosted service publishes.
 
 Requests go as a JSON `POST`. If the browser blocks that, the script falls back to a `GET` that returns a transparent pixel.
 
@@ -90,7 +90,12 @@ You can expose this as a button on your privacy page. The flag is the only thing
 
 - Visitors with Do Not Track enabled, unless you set `data-respect-dnt="false"`.
 - `localhost` and `file://` pages, unless `data-track-localhost="true"`.
-- Headless browsers and user agents that identify as bots or crawlers, both in the script and again on the server.
+- Headless browsers and user agents that identify as bots, crawlers, link previewers or HTTP libraries, both in the script and again on the server (the server uses the `ua-parser-js` bot database).
+- Requests from known data-centre, hosting and VPN address ranges (`BOT_DATACENTER_FILTER`), because scripted browsers on rented servers send a real browser's user agent and the address is the only thing they cannot fake. The address is checked in memory and discarded, as for the geo lookup. Apple's iCloud Private Relay ranges are exempt, so iPhone users behind the relay are counted.
+- Requests whose referrer is a known referrer-spam domain (`REFERRER_SPAM_LISTS`).
+- Groups of traffic that behave like a browser farm: many single-pageview visits an hour sharing one screen size, browser and language, with no engagement from any of them (`BOT_CLUSTER_FILTER`). Flagged groups are dropped for 24 hours.
+
+The dashboard shows how many requests were filtered in the selected period under the overview, split by reason on hover, so the filtering is checkable rather than taken on trust.
 - Prerendered pages.
 
 ## Ingest responses

@@ -1,5 +1,5 @@
 export interface TrackingPayload {
-  t: "pageview" | "event";
+  t: "pageview" | "event" | "engagement";
   sid: string;
   /**
    * Visitor and session ids used to be minted by the tracker and kept in a
@@ -20,6 +20,9 @@ export interface TrackingPayload {
   new_visitor?: 0 | 1 | "0" | "1";
   new_session?: 0 | 1 | "0" | "1";
   name?: string;
+  /** Engagement: visible milliseconds and scroll depth percent. */
+  e?: number;
+  sd?: number;
   [key: string]: any;
 }
 

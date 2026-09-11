@@ -6,6 +6,7 @@ import {
   type CustomEvent,
   type CustomEventProperty,
   type DimensionKey,
+  type FilteredTrafficResponse,
   type JourneyMetric,
   type JourneysResponse,
   type MainGraphResponse,
@@ -168,4 +169,12 @@ export const getCustomEventProperties = (
     event: eventName,
     ...(key ? { key } : {}),
     limit: 100,
+  });
+
+/** Filtered (dropped) requests for the period. Not affected by drill-down filters. */
+export const getFilteredTraffic = (scope: AnalyticsScope) =>
+  get<FilteredTrafficResponse>(`/${scope.siteId}/filtered-traffic`, {
+    period: scope.period,
+    ...(scope.from ? { from: scope.from } : {}),
+    ...(scope.to ? { to: scope.to } : {}),
   });

@@ -41,6 +41,11 @@ Every setting is an environment variable. The API reads `apps/api/.env` in devel
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `INGEST_HOSTNAME_CHECK` | `on` | Drops events whose page hostname is not the site's domain, a subdomain of it, or localhost, so a site id copied from a snippet cannot be used to pollute that site's numbers. `off` disables it for a site served from many unrelated domains |
+| `BOT_DATACENTER_FILTER` | `on` | Drops events whose client address is in a known data-centre, hosting or VPN range. Headless browsers on rented servers send a real browser's user agent and run the script, so the address is the one thing they cannot fake. The trade-off is that visitors on a commercial VPN are dropped too; `off` disables the check |
+| `DATACENTER_IP_LISTS` | the X4BNet data-centre lists plus Google Cloud's published ranges | Comma-separated URLs of range lists: plain text with one address or CIDR per line (IPv4 and IPv6, `#` comments), or a JSON file such as a cloud provider's published ranges, from which every quoted CIDR is taken. The daily `update-bot-lists` job (first run one minute after start) downloads them into `apps/api/geo/datacenter-ips.txt`; a download that parses to under 1,000 ranges is rejected and the previous file stays. Run `npx tsx scripts/update-bot-lists.ts` to fetch at once. The API image carries a copy taken at build time (`lists-seed/`), used until the first download, so a fresh install filters from its first request |
+| `DATACENTER_IP_ALLOWLISTS` | Apple's iCloud Private Relay egress list | Same format; addresses in these ranges are never dropped. Private Relay sends ordinary iPhone Safari users out through Akamai and Cloudflare space that the deny lists cover, so without this carve-out a third of its blocks would be treated as bots. Fetched by the same job into `apps/api/geo/datacenter-ips-allow.txt`. Add a corporate egress range here if an office behind a cloud proxy is being filtered |
+| `REFERRER_SPAM_LISTS` | the Matomo referrer spam list | Domains whose fabricated referrals exist only to appear in your Sources card. A request whose referrer is one of them, or a subdomain, is dropped. Same job, `apps/api/geo/referrer-spam.txt`; empty disables it |
+| `BOT_CLUSTER_FILTER` | `on` | Behavioural filter. Every five minutes the `detect-scripted-traffic` job looks at the last hour of sessions per site, grouped by screen size, browser and language, and flags a group of at least 50 visits from at least 20 visitors when 95% or more are single-pageview visits and not one reported engagement (people switch tabs and scroll; scripts do not). Requests matching a flagged group are dropped for 24 hours. A site is only examined once a fifth of its sessions carry engagement, so a site still on an older cached tracker is never judged. `off` disables detection and the check |
 
 ### Email
 
@@ -79,7 +84,7 @@ Self-hosters normally leave Paddle empty. See [self-hosting.md](self-hosting.md)
 
 | Variable | Notes |
 | --- | --- |
-| `MAXMIND_LICENSE_KEY` | Free GeoLite2 key. The weekly `update-geo` job (first run five minutes after start) downloads `GeoLite2-City.mmdb` into `apps/api/geo/` (a volume in Docker). Without it, country, region and city stay empty |
+| `MAXMIND_LICENSE_KEY` | Free GeoLite2 key. The weekly `update-geo` job (first run five minutes after start) downloads `GeoLite2-City.mmdb` into `apps/api/geo/` (a volume in Docker, shared with the data-centre range list above). Without it, country, region and city stay empty |
 
 ## Dashboard (`apps/app`)
 

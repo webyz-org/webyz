@@ -65,6 +65,12 @@ x-api-env: &api-env
   # 32 random bytes as hex; encrypts Search Console credentials at rest.
   ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
   INGEST_HOSTNAME_CHECK: ${INGEST_HOSTNAME_CHECK:-on}
+  # Drop events from data-centre, hosting and VPN ranges; the list is fetched daily into the geo volume.
+  BOT_DATACENTER_FILTER: ${BOT_DATACENTER_FILTER:-on}
+  DATACENTER_IP_LISTS: ${DATACENTER_IP_LISTS:-}
+  DATACENTER_IP_ALLOWLISTS: ${DATACENTER_IP_ALLOWLISTS:-}
+  REFERRER_SPAM_LISTS: ${REFERRER_SPAM_LISTS:-}
+  BOT_CLUSTER_FILTER: ${BOT_CLUSTER_FILTER:-on}
 
 services:
   postgres:

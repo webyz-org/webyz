@@ -90,6 +90,58 @@ export const ENCRYPTION_KEY = (process.env.ENCRYPTION_KEY ?? "").trim();
  */
 export const INGEST_HOSTNAME_CHECK = (process.env.INGEST_HOSTNAME_CHECK ?? "on").trim().toLowerCase() !== "off";
 
+/**
+ * Drop events from known data-centre, hosting and VPN address ranges
+ * (core/bots/datacenter-ips.ts). `off` disables it. The ranges come from the
+ * comma-separated URLs in DATACENTER_IP_LISTS, fetched daily by the
+ * `update-datacenter-ips` job into geo/datacenter-ips.txt; the default is the
+ * MIT-licensed X4BNet list, rebuilt from provider ASNs by its maintainers,
+ * plus Google Cloud's own published ranges, which that list only partly
+ * covers. A JSON source is reduced to the CIDRs it quotes.
+ */
+export const BOT_DATACENTER_FILTER = (process.env.BOT_DATACENTER_FILTER ?? "on").trim().toLowerCase() !== "off";
+export const DATACENTER_IP_LISTS = (
+  process.env.DATACENTER_IP_LISTS ??
+  "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv4.txt," +
+    "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv6.txt," +
+    "https://www.gstatic.com/ipranges/cloud.json"
+)
+  .split(",")
+  .map((url) => url.trim())
+  .filter(Boolean);
+
+/**
+ * Ranges never dropped even when a deny list carries them. Default: Apple's
+ * published iCloud Private Relay egress ranges, which sit inside Akamai and
+ * Cloudflare hosting space and belong to ordinary iPhone users.
+ */
+export const DATACENTER_IP_ALLOWLISTS = (
+  process.env.DATACENTER_IP_ALLOWLISTS ?? "https://mask-api.icloud.com/egress-ip-ranges.csv"
+)
+  .split(",")
+  .map((url) => url.trim())
+  .filter(Boolean);
+
+/**
+ * Referrer spam domains (core/bots/referrer-spam.ts); a request whose
+ * referrer is one of them, or a subdomain, is dropped. Default: the Matomo
+ * community list, the same one Plausible and Matomo use. Empty disables it.
+ */
+export const REFERRER_SPAM_LISTS = (
+  process.env.REFERRER_SPAM_LISTS ??
+  "https://raw.githubusercontent.com/matomo-org/referrer-spam-list/master/spammers.txt"
+)
+  .split(",")
+  .map((url) => url.trim())
+  .filter(Boolean);
+
+/**
+ * Behavioural filter (core/bots/clusters.ts): flag and drop groups of
+ * traffic that behave like a browser farm. `off` disables both the detection
+ * job and the ingest check.
+ */
+export const BOT_CLUSTER_FILTER = (process.env.BOT_CLUSTER_FILTER ?? "on").trim().toLowerCase() !== "off";
+
 // ─── Billing (Paddle) ─────────────────────────────────────────────────────────
 // Paddle is the merchant of record, which is why it is the provider: it sells,
 // charges tax and pays out, so no card ever reaches this server.

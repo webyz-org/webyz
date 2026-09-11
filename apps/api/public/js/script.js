@@ -236,6 +236,117 @@
     },
   };
 
+  /**
+   * Engagement: how long the page was actually in front of the visitor, and
+   * how far down they scrolled. Modelled on Plausible's engagement events.
+   *
+   * Time accumulates only while the tab is visible and focused, so a page
+   * left open in the background adds nothing. A report is sent when the tab
+   * is hidden, loses focus or is left, and before a client-side route change,
+   * whenever there is something new to say: at least three seconds of
+   * visible time since the last report, or a deeper scroll. The server adds
+   * the time to the session, so a one-page visit that was read for two
+   * minutes is no longer a 0 s visit.
+   */
+  var engagement = {
+    listening: false,
+    ignored: true,
+    url: "",
+    pid: "",
+    runningSince: 0,
+    accumulated: 0,
+    maxScrollPx: 0,
+    docHeight: 0,
+    sentScrollPx: -1,
+
+    start: function (url, pid) {
+      engagement.ignored = false;
+      engagement.url = url;
+      engagement.pid = pid;
+      engagement.accumulated = 0;
+      engagement.sentScrollPx = -1;
+      engagement.docHeight = engagement.documentHeight();
+      engagement.maxScrollPx = engagement.scrollDepthPx();
+      engagement.runningSince = engagement.isActive() ? Date.now() : 0;
+      engagement.listen();
+    },
+
+    isActive: function () {
+      return document.visibilityState === "visible" && document.hasFocus();
+    },
+
+    elapsed: function () {
+      return (
+        engagement.accumulated +
+        (engagement.runningSince ? Date.now() - engagement.runningSince : 0)
+      );
+    },
+
+    documentHeight: function () {
+      var body = document.body || {};
+      var el = document.documentElement || {};
+      return Math.max(
+        body.scrollHeight || 0, body.offsetHeight || 0, body.clientHeight || 0,
+        el.scrollHeight || 0, el.offsetHeight || 0, el.clientHeight || 0
+      );
+    },
+
+    scrollDepthPx: function () {
+      var el = document.documentElement || {};
+      var body = document.body || {};
+      var viewport = window.innerHeight || el.clientHeight || 0;
+      var top = window.scrollY || window.pageYOffset || el.scrollTop || body.scrollTop || 0;
+      return top + viewport;
+    },
+
+    onScroll: function () {
+      var px = engagement.scrollDepthPx();
+      if (px > engagement.maxScrollPx) engagement.maxScrollPx = px;
+      var height = engagement.documentHeight();
+      if (height > engagement.docHeight) engagement.docHeight = height;
+    },
+
+    onVisibility: function () {
+      if (engagement.isActive()) {
+        if (!engagement.runningSince) engagement.runningSince = Date.now();
+      } else {
+        engagement.accumulated = engagement.elapsed();
+        engagement.runningSince = 0;
+        engagement.flush();
+      }
+    },
+
+    flush: function () {
+      if (engagement.ignored) return;
+      var ms = engagement.elapsed();
+      if (engagement.maxScrollPx <= engagement.sentScrollPx && ms < 3000) return;
+      engagement.sentScrollPx = engagement.maxScrollPx;
+      var depth = engagement.docHeight
+        ? Math.min(100, Math.round((engagement.maxScrollPx / engagement.docHeight) * 100))
+        : 0;
+      engagement.accumulated = 0;
+      engagement.runningSince = engagement.isActive() ? Date.now() : 0;
+      network.send({
+        t: "engagement",
+        sid: config.siteId,
+        pid: engagement.pid,
+        url: engagement.url,
+        e: Math.round(ms),
+        sd: depth,
+      });
+    },
+
+    listen: function () {
+      if (engagement.listening) return;
+      engagement.listening = true;
+      document.addEventListener("visibilitychange", engagement.onVisibility);
+      window.addEventListener("blur", engagement.onVisibility);
+      window.addEventListener("focus", engagement.onVisibility);
+      window.addEventListener("pagehide", engagement.onVisibility);
+      window.addEventListener("scroll", engagement.onScroll, { passive: true });
+    },
+  };
+
   var tracker = {
     pageview: function (custom) {
       custom = custom || {};
@@ -245,6 +356,9 @@
         utils.log("duplicate pageview ignored");
         return Promise.resolve();
       }
+
+      // Leaving a page in a single-page app: report its engagement first.
+      if (engagement.listening) engagement.flush();
 
       state.currentUrl = pageData.url;
       state.currentRef = utils.getReferrer();
@@ -266,6 +380,7 @@
         if (k !== "force") payload[k] = custom[k];
       });
 
+      engagement.start(payload.url, state.pageviewId);
       return network.send(payload);
     },
 

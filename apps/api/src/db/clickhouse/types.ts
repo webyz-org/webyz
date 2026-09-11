@@ -9,6 +9,8 @@ export type SessionRow = {
   exit_page: string;
   page_views: number;
   events: number;
+  engaged_seconds: number;
+  scroll_depth: number;
   hostname: string;
   browser_family: string;
   browser_version: string;

@@ -3,6 +3,7 @@ import { Check, Copy, MoreHorizontal, Settings, Share2 } from "lucide-react";
 import { useState } from "react";
 
 import OverviewSurface from "../features/dashboard/components/OverviewSurface";
+import FilteredTrafficNote from "../features/dashboard/components/FilteredTrafficNote";
 import ContentsCard from "../features/dashboard/components/ContentsCard";
 import TechnologyCard from "../features/dashboard/components/TechnologyCard";
 import AcquisitionCard from "../features/dashboard/components/AcquisitionCard";
@@ -211,6 +212,7 @@ export default function DashboardPage() {
         scope={scope}
         detailsHref={`${base}/pages?${periodQuery(period, from, to)}`}
       />
+      <FilteredTrafficNote scope={scope} />
 
       {/* Key breakdowns: pages carry the most detail, so they get the wider
           column; sources sit beside them. */}

@@ -46,3 +46,4 @@ yarn.lock
 /src/generated/prisma
 
 /geo
+/lists-seed

@@ -37,10 +37,17 @@ FROM deps AS build
 COPY apps/api/prisma apps/api/prisma
 COPY apps/api/prisma.config.ts apps/api/tsconfig.json apps/api/tsconfig.build.json apps/api/
 COPY apps/api/src apps/api/src
+COPY apps/api/scripts apps/api/scripts
 WORKDIR /repo/apps/api
 # prisma generate needs a DATABASE_URL to parse the config; the value is not used.
 RUN DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm prisma:generate \
  && pnpm build
+# Seed copies of the bot filter lists (data-centre ranges, the Private Relay
+# carve-out, referrer spam), so a fresh install filters from its first request
+# and an install without egress still has lists. The daily job refreshes the
+# live copies in geo/; these are only read while those are missing. A build
+# that cannot reach the list sources fails here, visibly.
+RUN BOT_LISTS_DIR=/repo/apps/api/lists-seed node_modules/.bin/tsx scripts/update-bot-lists.ts
 
 # ─── runtime ────────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION}-bookworm-slim AS runtime
@@ -69,6 +76,7 @@ COPY apps/api/clickhouse apps/api/clickhouse
 # production, because it is the one place that has the database and the keys.
 COPY apps/api/scripts apps/api/scripts
 COPY apps/api/public apps/api/public
+COPY --from=build /repo/apps/api/lists-seed ./apps/api/lists-seed
 
 WORKDIR /repo/apps/api
 # geo/ holds the MaxMind database the update-geo job downloads; mount a volume.

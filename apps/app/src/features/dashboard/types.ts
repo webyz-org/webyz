@@ -52,6 +52,14 @@ export type TopStatsResponse = {
   top_stats: TopStat[] | null;
 };
 
+/** Requests the ingest bot filters refused in the period, by reason. */
+export type FilteredTrafficResponse = {
+  from: number;
+  to: number;
+  total: number;
+  reasons: Record<string, number>;
+};
+
 export type MainGraphResponse = {
   labels: string[];
   plot: number[];

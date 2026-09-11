@@ -12,5 +12,5 @@ export const publishTracking = async (
   const normalized = await normalizeTracking(payload, request);
   if (!normalized) return;
 
-  await track({ clickhouse: request.server.clickhouse }, normalized);
+  await track({ clickhouse: request.server.clickhouse, redis: request.ctx.redis }, normalized);
 };
