@@ -119,7 +119,7 @@ export default function AnalyticsCard<T extends { name?: string; percentage?: nu
   };
 
   return (
-    <section className="flex h-full flex-col rounded-xl border border-border bg-surface">
+    <section className="flex h-full min-w-0 flex-col rounded-xl border border-border bg-surface">
       <div className="flex items-center justify-between gap-3 border-b border-border px-4">
         <div
           ref={containerRef}

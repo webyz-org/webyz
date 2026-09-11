@@ -217,7 +217,7 @@ export default function SharedDashboardPage() {
 
         <OverviewSurface scope={scope} />
 
-        <div className="mt-6 grid gap-4 lg:grid-cols-[3fr_2fr]">
+        <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <ContentsCard scope={scope} />
           <AcquisitionCard scope={scope} />
         </div>
