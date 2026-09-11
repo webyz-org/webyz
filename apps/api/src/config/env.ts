@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { parseTrustProxy } from "./trust-proxy.js";
+import { listEnv } from "./list-env.js";
 
 const bool = (v: string | undefined, fallback = false) =>
   v === undefined ? fallback : v === "true" || v === "1";
@@ -100,40 +101,30 @@ export const INGEST_HOSTNAME_CHECK = (process.env.INGEST_HOSTNAME_CHECK ?? "on")
  * covers. A JSON source is reduced to the CIDRs it quotes.
  */
 export const BOT_DATACENTER_FILTER = (process.env.BOT_DATACENTER_FILTER ?? "on").trim().toLowerCase() !== "off";
-export const DATACENTER_IP_LISTS = (
-  process.env.DATACENTER_IP_LISTS ??
-  "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv4.txt," +
-    "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv6.txt," +
-    "https://www.gstatic.com/ipranges/cloud.json"
-)
-  .split(",")
-  .map((url) => url.trim())
-  .filter(Boolean);
+export const DATACENTER_IP_LISTS = listEnv(process.env.DATACENTER_IP_LISTS, [
+  "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv4.txt",
+  "https://raw.githubusercontent.com/X4BNet/lists_vpn/main/output/datacenter/ipv6.txt",
+  "https://www.gstatic.com/ipranges/cloud.json",
+]);
 
 /**
  * Ranges never dropped even when a deny list carries them. Default: Apple's
  * published iCloud Private Relay egress ranges, which sit inside Akamai and
  * Cloudflare hosting space and belong to ordinary iPhone users.
  */
-export const DATACENTER_IP_ALLOWLISTS = (
-  process.env.DATACENTER_IP_ALLOWLISTS ?? "https://mask-api.icloud.com/egress-ip-ranges.csv"
-)
-  .split(",")
-  .map((url) => url.trim())
-  .filter(Boolean);
+export const DATACENTER_IP_ALLOWLISTS = listEnv(process.env.DATACENTER_IP_ALLOWLISTS, [
+  "https://mask-api.icloud.com/egress-ip-ranges.csv",
+]);
 
 /**
  * Referrer spam domains (core/bots/referrer-spam.ts); a request whose
  * referrer is one of them, or a subdomain, is dropped. Default: the Matomo
- * community list, the same one Plausible and Matomo use. Empty disables it.
+ * community list, the same one Plausible and Matomo use. `off` disables it;
+ * empty means the default (config/list-env.ts).
  */
-export const REFERRER_SPAM_LISTS = (
-  process.env.REFERRER_SPAM_LISTS ??
-  "https://raw.githubusercontent.com/matomo-org/referrer-spam-list/master/spammers.txt"
-)
-  .split(",")
-  .map((url) => url.trim())
-  .filter(Boolean);
+export const REFERRER_SPAM_LISTS = listEnv(process.env.REFERRER_SPAM_LISTS, [
+  "https://raw.githubusercontent.com/matomo-org/referrer-spam-list/master/spammers.txt",
+]);
 
 /**
  * Behavioural filter (core/bots/clusters.ts): flag and drop groups of

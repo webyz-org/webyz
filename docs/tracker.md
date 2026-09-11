@@ -8,7 +8,7 @@ One script tag, served by your Webyz API. It records pageviews automatically, fo
   data-endpoint="https://api.example.com/api/v1/track"></script>
 ```
 
-Both attributes are required. The site id is on the setup screen after you add a website and in Site settings. The script is under 4 KB gzipped, loads with `defer`, and never blocks rendering.
+Both attributes are required. The site id is on the setup screen after you add a website and in Site settings. The script is about 7 KB gzipped, loads with `defer`, and never blocks rendering.
 
 ## Options
 
