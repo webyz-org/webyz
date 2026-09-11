@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Webyz Tracker Test</title>
+  </head>
+  <body>
+    <h1>Webyz Tracker Test</h1>
+    <p>
+      <a href="/examples/tracker/contact.html">Contact page</a> ·
+      <a href="#/about">Hash route: about</a> ·
+      <a href="#/pricing">Hash route: pricing</a>
+    </p>
+    <p>
+      <a href="https://example.com/" target="_blank" rel="noreferrer">Outbound link (new tab)</a> ·
+      <a href="/files/report.pdf" download>File download</a> ·
+      <a href="/examples/tracker/not-found.html">A missing page (404 event)</a>
+    </p>
+    <button data-analytics-event="Signup" data-analytics-plan="growth">Custom event: Signup</button>
+
+    <script
+      src="http://localhost:3042/js/script.js"
+      data-site-id="c69a1f4d-3ccd-48ab-902f-8fabc318ab9e"
+      data-endpoint="http://localhost:3042/api/v1/track"
+      data-debug="true"
+      data-track-localhost="true"
+      data-hash-routing="true"
+      data-outbound-links="true"
+      data-file-downloads="true"
+      data-track-404="true"
+    ></script>
+  </body>
+</html>

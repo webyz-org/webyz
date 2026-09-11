@@ -1,0 +1,140 @@
+body {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  color: var(--color-text-secondary);
+  background-color: var(--color-surface);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Set, not inherited: the children of <details> render through a shadow DOM
+   slot that author CSS cannot style, so `inherit` gave them content-box and
+   every w-full element inside the dropdown menus overflowed by its padding. */
+*,
+::before,
+::after {
+  box-sizing: border-box;
+}
+
+/* One content width, 1160px, with a 12 column grid inside. */
+.container {
+  width: 100%;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+@media (min-width: 768px) {
+  .container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* Display type: medium weight, tight, calm. */
+.display {
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.06;
+}
+
+/* The hero's texture: the dashboard's grey canvas fading to white. */
+.hero-bg {
+  background:
+    radial-gradient(rgba(45, 35, 35, 0.09) 1px, transparent 1.2px) center top / 24px 24px,
+    linear-gradient(to bottom, var(--color-bg), var(--color-surface));
+  -webkit-mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
+}
+
+details > summary {
+  list-style: none;
+  cursor: pointer;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise-in {
+  animation: rise-in 600ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.rise-in-2 {
+  animation-delay: 90ms;
+}
+.rise-in-3 {
+  animation-delay: 180ms;
+}
+.rise-in-4 {
+  animation-delay: 300ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rise-in {
+    animation: none;
+  }
+}
+
+/* Scroll reveal without JavaScript: fades and lifts as the element enters. */
+@supports (animation-timeline: view()) {
+  .reveal {
+    animation: rise-in linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 35%;
+  }
+}
+
+/* Reference shapes: slanted blocks and a slanted footer edge. */
+.slant-tr {
+  clip-path: polygon(0 12%, 100% 0, 100% 100%, 0 100%);
+}
+.slant-block {
+  clip-path: polygon(0 0, 100% 6%, 100% 100%, 0 100%);
+}
+.slant-photo {
+  clip-path: polygon(6% 0, 100% 3%, 94% 100%, 0 97%);
+}
+.slant-footer {
+  clip-path: polygon(0 9%, 100% 0, 100% 100%, 0 100%);
+}
+.hand {
+  font-family: var(--font-hand);
+  font-weight: 600;
+}
+
+/* Rendered documentation (/docs/*). The Markdown is written for GitHub, so
+   these rules make the same file read well here: measured line length, tables
+   that scroll instead of widening the page, code that looks like code. */
+.doc { font-size: 15.5px; line-height: 1.65; color: var(--color-text-secondary); }
+.doc > * + * { margin-top: 1em; }
+.doc h1 + * { margin-top: 1.5rem; }
+.doc h2 { margin-top: 2.75rem; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; color: var(--color-ink); }
+.doc h3 { margin-top: 2rem; font-size: 17px; font-weight: 600; color: var(--color-ink); }
+.doc p, .doc li { max-width: 68ch; }
+.doc a { color: var(--color-brand-ink); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--color-brand-ink) 40%, transparent); text-underline-offset: 2px; }
+.doc a:hover { text-decoration-color: currentColor; }
+.doc strong { color: var(--color-ink); font-weight: 600; }
+.doc ul, .doc ol { padding-left: 1.4em; }
+.doc ul { list-style: disc; }
+.doc ol { list-style: decimal; }
+.doc li + li { margin-top: 0.35em; }
+.doc li > ul, .doc li > ol { margin-top: 0.35em; }
+.doc code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em; background: var(--color-surface-2); border-radius: 4px; padding: 0.1em 0.35em; color: var(--color-ink); }
+.doc pre { overflow-x: auto; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-surface-2); padding: 14px 16px; font-size: 13px; line-height: 1.55; }
+.doc pre code { background: none; padding: 0; font-size: inherit; color: var(--color-ink); }
+.doc blockquote { border-left: 3px solid var(--color-border-strong); padding-left: 1em; color: var(--color-muted); }
+.doc hr { border: 0; border-top: 1px solid var(--color-border); margin: 2.5rem 0; }
+.doc-table { overflow-x: auto; border: 1px solid var(--color-border); border-radius: 10px; }
+.doc table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.doc th, .doc td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--color-border); }
+.doc th { font-weight: 600; color: var(--color-ink); background: var(--color-surface-2); white-space: nowrap; }
+.doc tr:last-child td { border-bottom: 0; }
+.doc td code { white-space: nowrap; }

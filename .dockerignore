@@ -1,0 +1,22 @@
+# Applies to every image built from the repo root (all three Dockerfiles are
+# built with the repo as context so pnpm can resolve the workspace lockfile).
+.git
+.turbo
+.vscode
+.idea
+**/node_modules
+**/dist
+**/.next
+**/tsconfig.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+apps/api/geo/*.mmdb
+apps/api/geo/*.tar.gz
+apps/api/scripts/stripe-sandbox/last-run.json
+examples
+api.bruno
+infra
+*.md
+!apps/api/docs/*.md
+!docs/*.md

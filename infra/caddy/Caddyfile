@@ -1,0 +1,44 @@
+# Webyz behind the bundled Caddy. DOMAIN comes from .env via
+# docker-compose.override.yml. TLS is automatic.
+#
+# One domain, routed by path: the API owns /api/*, /js/* (the tracker script)
+# and /health*; the dashboard, a static single-page app, gets everything else.
+# Its client-side routes never start with those prefixes.
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	@api path /api/* /js/* /health /health/*
+	handle @api {
+		# Tracker payloads are small; anything larger is not a pageview.
+		request_body {
+			max_size 64KB
+		}
+		reverse_proxy webyz-api:3042 {
+			# The realtime dashboard stream is server-sent events: no buffering,
+			# no idle timeout.
+			flush_interval -1
+			transport http {
+				read_timeout 1h
+			}
+		}
+	}
+
+	handle {
+		# The API sets its own headers (helmet). The dashboard is static, so
+		# they are added here. No frame-ancestors rule: shared dashboards may be
+		# embedded in an iframe on purpose.
+		header {
+			Strict-Transport-Security "max-age=31536000; includeSubDomains"
+			X-Content-Type-Options nosniff
+			Referrer-Policy strict-origin-when-cross-origin
+			Permissions-Policy "camera=(), microphone=(), geolocation=()"
+			-Server
+		}
+		reverse_proxy webyz-app:8080
+	}
+}
+
+www.{$DOMAIN} {
+	redir https://{$DOMAIN}{uri} permanent
+}

@@ -1,0 +1,89 @@
+# The hosted Webyz (webyz.io), layered on the open-source stack.
+#
+#   docker compose -f infra/docker-compose.yml -f infra/hosted/docker-compose.hosted.yml \
+#     --env-file infra/hosted/environment up -d --build
+#
+# Nothing in infra/ changes for this file to work: it adds what hosting the
+# product ourselves needs and nothing else.
+#
+#  - split hostnames: webyz.io (marketing), app.webyz.io (dashboard),
+#    api.webyz.io (API). The open-source stack serves one domain by path, so
+#    the API's URLs are overridden here and the dashboard is built with the API
+#    origin baked in;
+#  - the marketing site (apps/web), which the open-source stack does not run;
+#  - the existing nginx container on this host is the proxy, reaching each
+#    service by container name over the external `proxy` network. No host
+#    ports, no Caddy: docker-compose.override.yml is not loaded because the
+#    files are named explicitly.
+#
+# Secrets and host-specific values come from infra/hosted/environment, which
+# is not committed; infra/hosted/environment.example lists every key.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  clickhouse:
+    # Compose merges volume lists by container path, so the base file's mounts
+    # stay; relative paths resolve against the first -f file's directory (infra/).
+    volumes:
+      # Backup destination for `BACKUP DATABASE ... TO Disk('backups', ...)`,
+      # used by hosted/backup.sh. Holds only the archive in flight.
+      - ./hosted/clickhouse/backups.xml:/etc/clickhouse-server/config.d/webyz-backups.xml:ro
+      - chbackups:/backups
+
+  api:
+    networks: [proxy]
+    environment:
+      FRONTEND_URL: ${APP_ORIGIN:?set APP_ORIGIN in infra/hosted/environment}
+      APP_URL: ${APP_ORIGIN}
+      MARKETING_URL: ${MARKETING_ORIGIN:?set MARKETING_ORIGIN in infra/hosted/environment}
+      CORS_ORIGINS: ${APP_ORIGIN},${MARKETING_ORIGIN}
+      # Google's callbacks live on the API host, not the dashboard host the
+      # open-source stack derives them from.
+      GOOGLE_REDIRECT_URI: ${API_ORIGIN:?set API_ORIGIN in infra/hosted/environment}/api/v1/users/auth/google/callback
+      GSC_REDIRECT_URI: ${API_ORIGIN}/api/v1/gsc/callback
+      # One trusted hop: nginx. Cloudflare's hop is unwrapped by nginx itself
+      # (nginx/cloudflare-real-ip.conf), so the API sees the visitor's address.
+      TRUST_PROXY: "1"
+      REGISTRATION: ${REGISTRATION:-disabled}
+
+  app:
+    # The open-source image is same-origin; the hosted dashboard talks to
+    # another host, so it is its own build.
+    image: webyz-hosted/app:latest
+    build:
+      args:
+        VITE_API_BASE_URL: ${API_ORIGIN}
+        VITE_MARKETING_URL: ${MARKETING_ORIGIN}
+    networks: [proxy]
+
+  web:
+    image: webyz-hosted/web:latest
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Its own origin: canonical URLs, Open Graph tags, sitemap and robots.
+        NEXT_PUBLIC_SITE_URL: ${MARKETING_ORIGIN}
+        NEXT_PUBLIC_APP_URL: ${APP_ORIGIN}
+        NEXT_PUBLIC_API_BASE_URL: ${API_ORIGIN}
+        NEXT_PUBLIC_GITHUB_URL: ${GITHUB_URL:-https://github.com/nihalnclt/webyz}
+    container_name: webyz-web
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      api:
+        condition: service_started
+    networks: [proxy]
+
+networks:
+  # The shared nginx container's network, created outside this project.
+  proxy:
+    external: true
+
+volumes:
+  chbackups:

@@ -1,0 +1,22 @@
+# For an existing reverse proxy on the same host. Use instead of the Caddy
+# override:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d
+#
+# Publishes the API and the dashboard on the loopback interface only, so your
+# proxy (nginx, Traefik, Apache, another Caddy) can reach them at
+# 127.0.0.1:3042 and 127.0.0.1:3041 while nothing else on the network can.
+# Route /api/*, /js/* and /health* to the API and the rest to the dashboard;
+# reverse-proxy/nginx.conf.example shows the complete configuration.
+#
+# If your proxy is itself a container, skip this file and attach it to the
+# stack's `edge` network instead:  docker network connect webyz_edge <proxy>
+# then use webyz-api:3042 and webyz-app:8080 as upstreams.
+
+services:
+  api:
+    ports:
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-3042}:3042"
+  app:
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-3041}:8080"

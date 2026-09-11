@@ -1,0 +1,38 @@
+# Loaded automatically with docker-compose.yml: the bundled reverse proxy.
+#
+# Caddy is the only container with host ports. It terminates TLS for DOMAIN
+# with certificates from Let's Encrypt, renews them, and routes by path to the
+# API and the dashboard (caddy/Caddyfile). It adds exactly one X-Forwarded-For
+# hop, which is what TRUST_PROXY=1 in the API expects.
+#
+# Running behind a reverse proxy you already have? Do not load this file:
+#   docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: webyz-caddy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:?run ./setup.sh or set DOMAIN in .env}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [edge]
+    depends_on:
+      - api
+      - app
+
+volumes:
+  caddy_data:
+  caddy_config:

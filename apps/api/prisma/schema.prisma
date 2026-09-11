@@ -1,0 +1,727 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String  @id @default(uuid())
+  name      String  @db.Text
+  email     String  @unique @db.Text
+  password  String? @db.Text
+  avatarUrl String? @map("avatar_url") @db.Text
+
+  googleId String? @unique @map("google_id")
+  provider String  @default("email")
+
+  isActive Boolean @default(true) @map("is_active")
+
+  providerCustomerId String? @unique @map("provider_customer_id")
+
+  // Set when the account's one free trial starts. Eligibility check for trials.
+  trialUsedAt DateTime? @map("trial_used_at") @db.Timestamptz(6)
+
+  // Null until the address is confirmed. Google accounts are verified on
+  // creation (Google vouches for the address); password accounts confirm by
+  // link. The trial starts at verification, so a throwaway address gets Free.
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sessions      Session[]
+  websites      Website[]
+  subscriptions Subscription[]
+  resetTokens   PasswordResetToken[]
+  apiKeys       ApiKey[]
+  verifications EmailVerificationToken[]
+  memberships   WebsiteMember[]
+  sentInvites   WebsiteInvitation[]
+
+  @@map("users")
+}
+
+/// A single-use email confirmation link. Same shape and rules as
+/// PasswordResetToken: only the SHA-256 is stored, one live token per user.
+model EmailVerificationToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
+}
+
+/// Left behind when an account is deleted, so deleting and re-registering does
+/// not hand out another free trial. Holds only a hash of the email and the
+/// trial and payment facts needed for that decision; nothing else survives.
+model DeletedAccount {
+  id                  String    @id @default(uuid())
+  emailHash           String    @unique @map("email_hash")
+  trialUsedAt         DateTime? @map("trial_used_at") @db.Timestamptz(6)
+  hadPaidSubscription Boolean   @default(false) @map("had_paid_subscription")
+  deletedAt           DateTime  @default(now()) @map("deleted_at") @db.Timestamptz(6)
+
+  @@map("deleted_accounts")
+}
+
+/// A personal access token for the read-only HTTP API (Authorization: Bearer).
+/// Only the SHA-256 of the token is stored; the token itself is shown once at
+/// creation. keyPrefix is the first characters, kept so the owner can tell
+/// keys apart in the settings list. Revoking sets revokedAt; nothing is deleted.
+model ApiKey {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  name       String
+  keyPrefix  String    @map("key_prefix")
+  keyHash    String    @unique @map("key_hash")
+  lastUsedAt DateTime? @map("last_used_at") @db.Timestamptz(6)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("api_keys")
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id") @db.Text
+  userAgent String?  @map("user_agent") @db.Text
+  ipAddress String?  @map("ip_address") @db.Text
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId])
+  @@map("sessions")
+}
+
+/// A single-use password reset link.
+/// Only the SHA-256 of the token is stored, so a database leak does not hand
+/// over working reset links.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model Website {
+  id       String @id @default(uuid())
+  name     String
+  domain   String @unique
+  timezone String @default("UTC")
+  userId   String @map("user_id") @db.Text
+
+  // Flipped by enforce-limits job when a free-plan website exceeds its quota.
+  // Checked at ingest time before writing events to ClickHouse.
+  isBlocked Boolean   @default(false) @map("is_blocked")
+  blockedAt DateTime? @map("blocked_at") @db.Timestamptz(6)
+
+  // False when the plan allows fewer sites than the account has (downgrade,
+  // trial end). Inactive sites keep their history but stop ingesting.
+  isActive          Boolean @default(true) @map("is_active")
+  restrictionReason String? @map("restriction_reason")
+
+  // Public dashboard sharing. publicSlug is the unguessable link segment; it is
+  // rotated when sharing is turned off and on again so old links die.
+  isPublic   Boolean @default(false) @map("is_public")
+  publicSlug String? @unique @map("public_slug")
+  // Optional bcrypt hash guarding the public dashboard. Null means the link
+  // alone opens it. Cleared whenever sharing is turned off.
+  sharePasswordHash String? @map("share_password_hash")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goals         Goal[]
+  funnels       Funnel[]
+  searchConsole SearchConsoleConnection?
+  segments      Segment[]
+  emailReports  EmailReport[]
+  trafficAlert  TrafficAlert?
+  members       WebsiteMember[]
+  invitations   WebsiteInvitation[]
+
+  @@index([userId])
+  @@index([isBlocked])
+  @@map("websites")
+}
+
+/// A conversion definition. Either matches a custom event by name, or a
+/// pageview by exact path. Exactly one of eventName / pagePath is set.
+model Goal {
+  id        String @id @default(uuid())
+  websiteId String @map("website_id")
+
+  name      String
+  eventName String? @map("event_name")
+  pagePath  String? @map("page_path")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@unique([websiteId, name])
+  @@index([websiteId])
+  @@map("goals")
+}
+
+model Plan {
+  id          String  @id @default(uuid())
+  // Stable slug (free, starter, growth, business). Code references plans by
+  // code, never by id, so ids can differ between environments.
+  code        String  @unique
+  name        String
+  description String?
+
+  monthlyPrice Int    @map("monthly_price") // cents
+  yearlyPrice  Int    @map("yearly_price") // cents
+  currency     String @default("usd")
+  sortOrder    Int    @default(0) @map("sort_order")
+
+  // Events included in base price before overage kicks in
+  eventLimit Int @map("event_limit")
+
+  // Non-null = pay as you go, overage billed in cents per 1,000 events and
+  // traffic never blocked below the spend cap. Null = hard limit (free tier).
+  overagePricePer1k Int? @map("overage_price_per_1k")
+  // Deprecated: superseded by overagePricePer1k, kept until both front ends
+  // stop reading it. Seeded as overagePricePer1k * 100.
+  extraPricePer100k Int? @map("extra_price_per_100k")
+
+  // Spending protection bounds in cents, derived from the catalog multipliers
+  // at seed time. Null max means no ceiling.
+  spendCapDefaultCents Int? @map("spend_cap_default_cents")
+  spendCapMinCents     Int? @map("spend_cap_min_cents")
+  spendCapMaxCents     Int? @map("spend_cap_max_cents")
+
+  // Feature and limit entitlements, validated against the catalog schema.
+  // eventLimit / websiteLimit / dataRetentionDays are mirrored here as
+  // events_per_period / sites / retention_days; the JSON is the read path.
+  entitlements Json @default("{}")
+
+  dataRetentionDays Int @default(180) @map("data_retention_days")
+  websiteLimit      Int @default(1) @map("website_limit")
+
+  // Provider price ids for the base plan (Paddle price ids, pri_...). Null
+  // means the plan cannot be bought on this installation. Overage has no
+  // price of its own: it is charged as a one-time item priced from
+  // overagePricePer1k, because Paddle has no metered prices.
+  providerPriceMonthlyId String? @unique @map("provider_price_monthly_id")
+  providerPriceYearlyId  String? @unique @map("provider_price_yearly_id")
+
+  isFree   Boolean @default(false) @map("is_free")
+  isActive Boolean @default(true) @map("is_active")
+  isPublic Boolean @default(true) @map("is_public") // false = custom/enterprise plan
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  planId String @map("plan_id")
+
+  status SubscriptionStatus @default(ACTIVE)
+
+  // The provider subscription (Paddle sub_...). Null means this row is local
+  // only: the free plan or a trial, neither of which has a provider object.
+  providerSubscriptionId String? @unique @map("provider_subscription_id")
+
+  billingCycle BillingCycle @default(MONTHLY) @map("billing_cycle")
+
+  // The USAGE period, always about a month long, because quotas and overage
+  // are monthly. For monthly plans it is the provider billing period. For
+  // annual ones it is a local monthly window anchored to the base period
+  // start, since the provider period is the whole prepaid year.
+  currentPeriodStart DateTime? @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd   DateTime? @map("current_period_end") @db.Timestamptz(6)
+
+  // The BASE period: the provider billing period. The prepaid year for annual
+  // plans, the same as the usage period for monthly ones. Cancellation and
+  // entitlement display use this, never the usage period.
+  basePeriodStart DateTime? @map("base_period_start") @db.Timestamptz(6)
+  basePeriodEnd   DateTime? @map("base_period_end") @db.Timestamptz(6)
+
+  // Provider-side scheduled cancellation date, if any (Paddle
+  // scheduled_change.effective_at with action cancel).
+  cancelAt DateTime? @map("cancel_at") @db.Timestamptz(6)
+
+  cancelAtPeriodEnd Boolean   @default(false) @map("cancel_at_period_end")
+  trialStartsAt     DateTime? @map("trial_starts_at") @db.Timestamptz(6)
+  trialEndsAt       DateTime? @map("trial_ends_at") @db.Timestamptz(6)
+  canceledAt        DateTime? @map("canceled_at") @db.Timestamptz(6)
+
+  // Why ingest is currently restricted, if it is. NONE means tracking is on.
+  restriction  SubscriptionRestriction @default(NONE)
+  restrictedAt DateTime?               @map("restricted_at") @db.Timestamptz(6)
+
+  // Set on payment failure. Dashboards stay open until this passes.
+  graceEndsAt DateTime? @map("grace_ends_at") @db.Timestamptz(6)
+
+  // Customer chosen spending cap in cents for the billing period, base price
+  // included. Null falls back to the plan default.
+  spendCapCents Int? @map("spend_cap_cents")
+  // A cap lowered below what the period has already cost never applies to
+  // usage already incurred: it waits here and becomes spendCapCents when the
+  // next usage period opens.
+  pendingSpendCapCents Int? @map("pending_spend_cap_cents")
+
+  // Scheduled downgrade, held here and applied at pendingChangeAt by the
+  // apply-plan-changes job. Paddle has no provider-side schedule for an item
+  // change, so this row is the only record of it.
+  pendingPlanId       String?       @map("pending_plan_id")
+  pendingBillingCycle BillingCycle? @map("pending_billing_cycle")
+  pendingChangeAt     DateTime?     @map("pending_change_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan                Plan                 @relation(fields: [planId], references: [id])
+  billingPeriodUsages BillingPeriodUsage[]
+  usageRecords        UsageRecord[]
+  usageBuckets        UsageBucket[]
+  invoices            BillingInvoice[]
+  notifications       BillingNotification[]
+
+  @@index([userId, status])
+  @@index([status])
+  @@index([currentPeriodEnd])
+  @@index([providerSubscriptionId])
+  @@index([pendingChangeAt])
+  @@index([trialEndsAt])
+  @@map("subscriptions")
+}
+
+enum SubscriptionRestriction {
+  NONE
+  FREE_QUOTA
+  SPEND_CAP
+  PAYMENT_FAILED
+  TRIAL_ENDED
+}
+
+/// One row per provider webhook event, inserted before processing. The
+/// primary key is the provider's event id, so a redelivered event cannot be
+/// processed twice and processing order does not matter.
+model BillingEvent {
+  id          String             @id
+  provider    String             @default("paddle")
+  type        String
+  status      BillingEventStatus @default(RECEIVED)
+  error       String?
+  payload     Json?
+  receivedAt  DateTime           @default(now()) @map("received_at") @db.Timestamptz(6)
+  processedAt DateTime?          @map("processed_at") @db.Timestamptz(6)
+
+  @@index([status, receivedAt])
+  @@index([type])
+  @@map("billing_events")
+}
+
+enum BillingEventStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
+/// One row per billing notification actually sent, so trial reminders, usage
+/// warnings and payment emails go out exactly once per (subscription, kind,
+/// scope). scopeKey is the usage period id, the trial id, or the invoice id.
+model BillingNotification {
+  id             String   @id @default(uuid())
+  subscriptionId String   @map("subscription_id")
+  kind           String
+  scopeKey       String   @map("scope_key")
+  sentAt         DateTime @default(now()) @map("sent_at") @db.Timestamptz(6)
+  delivered      Boolean  @default(true)
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, kind, scopeKey])
+  @@index([kind, sentAt])
+  @@map("billing_notifications")
+}
+
+/// A provider invoice as seen through webhooks, with its lines classified
+/// into base (licensed) and usage (metered) so reconciliation can compare the
+/// metered quantity with the closed usage period it bills, and assert that a
+/// monthly usage invoice never carries the annual base.
+model BillingInvoice {
+  id                String  @id @default(uuid())
+  provider          String  @default("paddle")
+  providerInvoiceId String  @unique @map("provider_invoice_id")
+  subscriptionId    String? @map("subscription_id")
+
+  status        String
+  billingReason String? @map("billing_reason")
+  currency      String
+  subtotalCents Int     @map("subtotal_cents")
+  totalCents    Int     @map("total_cents")
+  amountPaidCents Int   @default(0) @map("amount_paid_cents")
+
+  // Lines: [{ kind: "base" | "usage" | "other", priceId, quantity, amountCents,
+  //   periodStart, periodEnd, providerItemId }]
+  lines Json
+
+  hasBaseLine  Boolean @default(false) @map("has_base_line")
+  hasUsageLine Boolean @default(false) @map("has_usage_line")
+  // Raw overage events behind the usage line, when the provider states them.
+  // Paddle does not: the line carries units only, so this stays null there
+  // and reconciliation compares units.
+  usageQuantity Int?   @map("usage_quantity")
+  // The units the amount was computed from: ceil(events / 1,000).
+  usageUnits   Int?    @map("usage_units")
+  // Period of the usage line(s), for matching to a closed usage period.
+  usagePeriodStart DateTime? @map("usage_period_start") @db.Timestamptz(6)
+  usagePeriodEnd   DateTime? @map("usage_period_end") @db.Timestamptz(6)
+
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  finalizedAt DateTime? @map("finalized_at") @db.Timestamptz(6)
+  paidAt      DateTime? @map("paid_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([subscriptionId, createdAt])
+  @@index([usagePeriodStart])
+  @@map("billing_invoices")
+}
+
+// One row per subscription per billing period.
+// Synced hourly from ClickHouse by Job 1.
+// Used by the dashboard, overage charging, and limit enforcement.
+model BillingPeriodUsage {
+  id             String @id @default(uuid())
+  subscriptionId String @map("subscription_id")
+
+  periodStart DateTime @map("period_start") @db.Timestamptz(6)
+  periodEnd   DateTime @map("period_end") @db.Timestamptz(6)
+
+  // Billable events in this period, recomputed hourly from the usage buckets
+  // plus the live partial hour. Exact count, never an estimate.
+  totalEvents BigInt @default(0) @map("total_events")
+
+  // Plan allowance in force for this period, refreshed on every sync so an
+  // upgrade mid-period raises it immediately.
+  includedEvents BigInt @default(0) @map("included_events")
+  // max(0, totalEvents - includedEvents). Stored for cheap dashboard reads.
+  overageEvents  BigInt @default(0) @map("overage_events")
+
+  // OPEN while the subscription's current period; CLOSED after the final
+  // aggregation once the period has rolled. Closed periods are history.
+  status   UsagePeriodStatus @default(OPEN)
+  closedAt DateTime?         @map("closed_at") @db.Timestamptz(6)
+
+  // Billing checkpoint: overage events already charged to the provider.
+  // reportedEvents <= overageEvents always.
+  reportedEvents BigInt    @default(0) @map("reported_events")
+  lastReportedAt DateTime? @map("last_reported_at") @db.Timestamptz(6)
+
+  // When spending protection fired for this period, if it did.
+  spendCapTriggeredAt DateTime? @map("spend_cap_triggered_at") @db.Timestamptz(6)
+
+  // Prevents duplicate warning emails. Stores last threshold sent: 0.8, 0.9, or 1.0
+  lastWarnedThreshold Float? @map("last_warned_threshold")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  subscription Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  usageRecords UsageRecord[]
+  buckets      UsageBucket[]
+
+  @@unique([subscriptionId, periodStart])
+  @@index([subscriptionId])
+  @@index([status])
+  @@map("billing_period_usages")
+}
+
+enum UsagePeriodStatus {
+  OPEN
+  CLOSED
+}
+
+/// One hour of billable events for one subscription. Recomputed from
+/// ClickHouse on every sync, so re-running is idempotent and late-arriving
+/// events are corrected. The period total is the sum of its closed buckets
+/// plus the live count for the current hour.
+model UsageBucket {
+  id                   String @id @default(uuid())
+  subscriptionId       String @map("subscription_id")
+  billingPeriodUsageId String @map("billing_period_usage_id")
+
+  bucketStart DateTime @map("bucket_start") @db.Timestamptz(6)
+  quantity    BigInt
+  source      String   @default("clickhouse")
+  computedAt  DateTime @default(now()) @map("computed_at") @db.Timestamptz(6)
+
+  subscription Subscription       @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  period       BillingPeriodUsage @relation(fields: [billingPeriodUsageId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, bucketStart])
+  @@index([billingPeriodUsageId])
+  @@map("usage_buckets")
+}
+
+// One row per overage charge sent to the provider, created by the
+// charge-overage job when a closed period has unbilled overage. The
+// idempotency key makes a retry safe.
+model UsageRecord {
+  id                   String @id @default(uuid())
+  subscriptionId       String @map("subscription_id")
+  billingPeriodUsageId String @map("billing_period_usage_id")
+
+  // Overage events covered by this report. Legacy rows hold the whole period;
+  // delta rows hold the increment since the previous SENT report.
+  overageEvents BigInt @map("overage_events")
+
+  // Delta reporting: the increment sent and the period's cumulative overage
+  // after it. idempotencyKey = "<periodId>:<cumulativeAfter>", so the same
+  // checkpoint can never be sent twice.
+  deltaEvents     BigInt? @map("delta_events")
+  cumulativeAfter BigInt? @map("cumulative_after")
+  idempotencyKey  String? @unique @map("idempotency_key")
+
+  status    UsageReportStatus @default(SENT)
+  attempts  Int               @default(0)
+  lastError String?           @map("last_error")
+  provider  String            @default("paddle")
+
+  // The provider transaction the charge created, once accepted.
+  providerTransactionId String?   @map("provider_transaction_id")
+  reportedAt            DateTime? @map("reported_at") @db.Timestamptz(6)
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  subscription       Subscription       @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  billingPeriodUsage BillingPeriodUsage @relation(fields: [billingPeriodUsageId], references: [id])
+
+  @@index([subscriptionId, createdAt])
+  @@index([status])
+  @@map("usage_records")
+}
+
+enum UsageReportStatus {
+  PENDING
+  SENT
+  FAILED
+  // Below the provider's minimum charge; settled without a transaction.
+  WAIVED
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAST_DUE
+  TRIALING
+  INCOMPLETE
+  UNPAID
+}
+
+/// Google Search Console connection for one website. Holds the OAuth refresh
+/// token and the selected GSC property; search data itself is never stored,
+/// it is pulled live from Google and cached briefly in Redis.
+model SearchConsoleConnection {
+  id        String @id @default(uuid())
+  websiteId String @unique @map("website_id")
+
+  // Long-lived OAuth credential with the webmasters.readonly scope only.
+  refreshToken String @map("refresh_token") @db.Text
+
+  // GSC property this site reads from, e.g. "sc-domain:example.com" or
+  // "https://example.com/". Null until the owner picks one after connecting.
+  propertyUri String? @map("property_uri")
+
+  // Which Google account authorized the connection, for the settings UI.
+  googleEmail String? @map("google_email")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@map("search_console_connections")
+}
+
+/// An ordered conversion funnel of 2-8 steps. Each step matches either a
+/// custom event by name or a pageview by exact path - the same rule as Goal.
+/// Analysis is computed live in ClickHouse (windowFunnel); nothing is stored.
+model Funnel {
+  id        String @id @default(uuid())
+  websiteId String @map("website_id")
+  name      String
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  website Website      @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  steps   FunnelStep[]
+
+  @@unique([websiteId, name])
+  @@index([websiteId])
+  @@map("funnels")
+}
+
+model FunnelStep {
+  id       String @id @default(uuid())
+  funnelId String @map("funnel_id")
+
+  /// 1-based order within the funnel.
+  position Int
+
+  /// Display label; defaults to the matched value in the UI when empty.
+  label     String  @default("")
+  eventName String? @map("event_name")
+  pagePath  String? @map("page_path")
+
+  funnel Funnel @relation(fields: [funnelId], references: [id], onDelete: Cascade)
+
+  @@unique([funnelId, position])
+  @@map("funnel_steps")
+}
+
+/// A named set of dashboard filters, saved per site so a view such as
+/// "Organic, mobile, not the blog" is one click. `filters` holds the wire form
+/// the API takes (`{ "browser": "Chrome", "page": "!~/blog" }`); the API
+/// validates keys and operators on save and again when applying.
+model Segment {
+  id        String @id @default(uuid())
+  websiteId String @map("website_id")
+  name      String
+  filters   Json
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@unique([websiteId, name])
+  @@index([websiteId])
+  @@map("segments")
+}
+
+enum ReportFrequency {
+  WEEKLY
+  MONTHLY
+}
+
+/// A scheduled summary email. Weekly goes out Monday morning for the previous
+/// week, monthly on the 1st for the previous month, both in the site's own
+/// timezone. `lastPeriodEnd` records the period boundary the last report
+/// covered, so a restart never sends the same period twice.
+model EmailReport {
+  id         String          @id @default(uuid())
+  websiteId  String          @map("website_id")
+  frequency  ReportFrequency
+  recipients String[]
+
+  lastPeriodEnd DateTime? @map("last_period_end") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@unique([websiteId, frequency])
+  @@map("email_reports")
+}
+
+/// Traffic spike notification: when the visitors on the site right now cross
+/// `threshold`, the recipients get one email, then nothing for a cooldown so
+/// a busy day is one message rather than one every five minutes.
+model TrafficAlert {
+  id         String   @id @default(uuid())
+  websiteId  String   @unique @map("website_id")
+  threshold  Int
+  recipients String[]
+
+  lastTriggeredAt DateTime? @map("last_triggered_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@map("traffic_alerts")
+}
+
+enum WebsiteRole {
+  /// Everything the owner can do on the site except delete it, transfer it or
+  /// manage billing: settings, goals, funnels, sharing, members.
+  ADMIN
+  /// Read the dashboard, including realtime and exports.
+  VIEWER
+}
+
+/// Someone other than the owner with access to one site. Plan limits on
+/// members count against the owner's plan, since the owner pays.
+model WebsiteMember {
+  id        String      @id @default(uuid())
+  websiteId String      @map("website_id")
+  userId    String      @map("user_id")
+  role      WebsiteRole
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([websiteId, userId])
+  @@index([userId])
+  @@map("website_members")
+}
+
+/// A pending invitation to join a site. Only the SHA-256 of the token in the
+/// emailed link is stored. Accepting needs a signed-in account whose email
+/// matches, so a forwarded link cannot admit someone else.
+model WebsiteInvitation {
+  id          String      @id @default(uuid())
+  websiteId   String      @map("website_id")
+  email       String
+  role        WebsiteRole
+  tokenHash   String      @unique @map("token_hash")
+  invitedById String      @map("invited_by_id")
+  expiresAt   DateTime    @map("expires_at") @db.Timestamptz(6)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  website   Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  invitedBy User    @relation(fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@unique([websiteId, email])
+  @@index([expiresAt])
+  @@map("website_invitations")
+}

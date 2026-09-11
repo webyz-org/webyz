@@ -1,0 +1,179 @@
+# Webyz, self-hosted. From this directory:
+#
+#   ./setup.sh analytics.example.com      writes .env with generated passwords
+#   docker compose up -d                  everything, TLS included
+#
+# `docker compose` reads this file plus docker-compose.override.yml, which
+# adds Caddy on ports 80 and 443 with automatic certificates for DOMAIN. One
+# domain serves both the dashboard and the API: Caddy sends /api/*, /js/* and
+# /health to the API and everything else to the dashboard, so no CORS, no
+# second hostname, no build-time URLs.
+#
+# Behind your own reverse proxy instead: see docs/self-hosting.md, which
+# swaps the override for docker-compose.expose.yml.
+#
+# Images: prebuilt ones are pulled from IMAGE_REGISTRY (published by CI on
+# every release); `docker compose build` builds the same images from this
+# checkout when you have changed the code or the registry is unreachable.
+#
+# `migrate` is a one-shot that applies Prisma and ClickHouse migrations and
+# seeds the plan catalogue; `api` waits for it, so every `up` is
+# migrate-then-start without a manual step.
+
+name: webyz
+
+# Docker's default json-file driver never rotates: on a busy site the API log
+# alone can fill a disk in months. Every service caps its logs.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-api-env: &api-env
+  NODE_ENV: production
+  PORT: "3042"
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  # Exactly one reverse proxy (Caddy or yours) appends the client address.
+  TRUST_PROXY: ${TRUST_PROXY:-1}
+  DATABASE_URL: postgresql://webyz:${POSTGRES_PASSWORD:?run ./setup.sh or set POSTGRES_PASSWORD in .env}@postgres:5432/webyz
+  CLICKHOUSE_URL: http://clickhouse:8123
+  CLICKHOUSE_USER: default
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?run ./setup.sh or set CLICKHOUSE_PASSWORD in .env}
+  CLICKHOUSE_DB: webyz_analytics
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  # Self-host default: only the first account can be created. Set
+  # REGISTRATION=open in .env to allow public signups.
+  REGISTRATION: ${REGISTRATION:-disabled}
+  # auto: confirm addresses by email only when a mail provider is configured.
+  EMAIL_VERIFICATION: ${EMAIL_VERIFICATION:-auto}
+  FRONTEND_URL: ${BASE_URL:?run ./setup.sh or set BASE_URL in .env}
+  APP_URL: ${BASE_URL}
+  CORS_ORIGINS: ${CORS_ORIGINS:-}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  GOOGLE_REDIRECT_URI: ${BASE_URL}/api/v1/users/auth/google/callback
+  PADDLE_API_KEY: ${PADDLE_API_KEY:-}
+  PADDLE_CLIENT_TOKEN: ${PADDLE_CLIENT_TOKEN:-}
+  PADDLE_WEBHOOK_SECRET: ${PADDLE_WEBHOOK_SECRET:-}
+  PADDLE_ENVIRONMENT: ${PADDLE_ENVIRONMENT:-}
+  PADDLE_IP_ALLOWLIST: ${PADDLE_IP_ALLOWLIST:-}
+  RESEND_API_KEY: ${RESEND_API_KEY:-}
+  EMAIL_FROM: ${EMAIL_FROM:-}
+  MAXMIND_LICENSE_KEY: ${MAXMIND_LICENSE_KEY:-}
+  # 32 random bytes as hex; encrypts Search Console credentials at rest.
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+  INGEST_HOSTNAME_CHECK: ${INGEST_HOSTNAME_CHECK:-on}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      POSTGRES_USER: webyz
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?run ./setup.sh or set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: webyz
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U webyz -d webyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      CLICKHOUSE_DB: webyz_analytics
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?run ./setup.sh or set CLICKHOUSE_PASSWORD in .env}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - chdata:/var/lib/clickhouse
+      # Small-server defaults: warning-level logs and no internal query, trace
+      # or metric log tables, which otherwise grow by gigabytes.
+      - ./clickhouse/config.xml:/etc/clickhouse-server/config.d/webyz.xml:ro
+      - ./clickhouse/users.xml:/etc/clickhouse-server/users.d/webyz.xml:ro
+    networks: [internal]
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8123/ping || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    logging: *logging
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  migrate:
+    image: ${IMAGE_REGISTRY:-ghcr.io/nihalnclt}/webyz-api:${IMAGE_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    command: ["sh", "scripts/migrate-deploy.sh"]
+    environment: *api-env
+    logging: *logging
+    restart: "no"
+    networks: [internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+
+  api:
+    image: ${IMAGE_REGISTRY:-ghcr.io/nihalnclt}/webyz-api:${IMAGE_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    container_name: webyz-api
+    restart: unless-stopped
+    logging: *logging
+    environment: *api-env
+    volumes:
+      # MaxMind database, downloaded by the update-geo job when the key is set.
+      - geodata:/repo/apps/api/geo
+    networks: [internal, edge]
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+
+  app:
+    image: ${IMAGE_REGISTRY:-ghcr.io/nihalnclt}/webyz-app:${IMAGE_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: apps/app/Dockerfile
+    container_name: webyz-app
+    restart: unless-stopped
+    logging: *logging
+    # Unprivileged nginx listens on 8080 inside the container.
+    networks: [edge]
+
+networks:
+  internal: {}
+  # The proxy's network. Caddy (docker-compose.override.yml) joins it; an
+  # external proxy container can be attached to it with `docker network connect`.
+  edge: {}
+
+volumes:
+  pgdata:
+  chdata:
+  redisdata:
+  geodata:

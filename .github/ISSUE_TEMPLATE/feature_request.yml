@@ -1,0 +1,23 @@
+name: Feature request
+description: Something Webyz should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+      description: The behaviour you want. If you have seen it done well elsewhere, say where.
+    validations:
+      required: true
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy check
+      description: Webyz stores no personal data about visitors. If this feature would need identifying data, say how it stays within that rule.

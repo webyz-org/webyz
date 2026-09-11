@@ -1,0 +1,153 @@
+export type SessionRow = {
+  session_id: string;
+  website_id: string;
+  user_id: string;
+  start_time: number;
+  end_time: number;
+  duration_seconds: number;
+  entry_page: string;
+  exit_page: string;
+  page_views: number;
+  events: number;
+  hostname: string;
+  browser_family: string;
+  browser_version: string;
+  os_family: string;
+  os_version: string;
+  device_type: string;
+  device_brand: string;
+  screen: string;
+  language: string;
+  country: string;
+  sub_division_1: string;
+  sub_division_2: string;
+  city: string;
+  channel: string;
+  referrer_domain: string;
+  utm_source: string;
+  utm_medium: string;
+  utm_campaign: string;
+  utm_content: string;
+  utm_term: string;
+};
+
+export type BrowserStatsRow = {
+  name: string;
+  visitors: number;
+  visit_duration?: number;
+  bounce_rate?: number;
+};
+
+export type BrowserVersionStatsRow = {
+  version: string;
+  browser: string;
+  visitors: number;
+  visit_duration?: number;
+  bounce_rate?: number;
+};
+
+export type OSStatsRow = {
+  name: string;
+  visitors: number;
+  visit_duration?: number;
+  bounce_rate?: number;
+};
+
+export type OSVersionsStatsRow = {
+  version: string;
+  os: string;
+  visitors: number;
+  visit_duration?: number;
+  bounce_rate?: number;
+};
+
+export type DeviceTypeStatsRow = {
+  name: string;
+  visitors: number;
+  visit_duration?: number;
+  bounce_rate?: number;
+};
+
+export type TopPagesStatsRows = {
+  page: string;
+  visitors: number;
+  pageviews: number;
+  time_on_page?: number;
+  bounce_rate?: number;
+};
+
+export type EntryPagesStatsRows = {
+  page: string;
+  visitors: number;
+  visit_duration?: number;
+  bounce_rate?: number;
+  entrances?: number;
+};
+
+export type ExitPagesStatsRows = {
+  page: string;
+  visitors: number;
+  exits: number;
+};
+
+export type ChannelsStatsRow = {
+  name: string;
+  visitors: number;
+  visit_duration?: number;
+  bounce_rate?: number;
+};
+
+export type SourceStatsRow = {
+  name: string;
+  visitors: number;
+  visit_duration?: number;
+  bounce_rate?: number;
+};
+
+export type UTMMediumStatsRow = {
+  name: string;
+  visitors: number;
+  visit_duration?: number;
+  bounce_rate?: number;
+};
+
+export type UTMSourceStatsRow = {
+  name: string;
+  visitors: number;
+  visit_duration?: number;
+  bounce_rate?: number;
+};
+
+export type UTMCampaignStatsRow = {
+  name: string;
+  visitors: number;
+  visit_duration?: number;
+  bounce_rate?: number;
+};
+
+export type UTMContentStatsRow = {
+  name: string;
+  visitors: number;
+  visit_duration?: number;
+  bounce_rate?: number;
+};
+
+export type UTMTermStatsRow = {
+  name: string;
+  visitors: number;
+  visit_duration?: number;
+  bounce_rate?: number;
+};
+
+export type TopStatsRow = {
+  visitors: number;
+  prev_visitors: number;
+  visits: number;
+  prev_visits: number;
+  pageviews: number;
+  prev_pageviews: number;
+  visit_duration: number;
+  prev_visit_duration: number;
+  bounces: number;
+  prev_bounces: number;
+};

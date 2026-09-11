@@ -1,0 +1,12 @@
+opencollection: 1.0.0
+info:
+  name: "Webyz"
+  type: workspace
+
+collections:
+  - name: "website"
+    path: "collections/website"
+
+specs:
+
+docs: ''

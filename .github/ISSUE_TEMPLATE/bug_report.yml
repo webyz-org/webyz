@@ -1,0 +1,50 @@
+name: Bug report
+description: Something does not work the way the docs say it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Security problems go to the address in SECURITY.md, not here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The image tag or commit hash you are running (`docker compose images` shows it).
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Self-hosted with the bundled Caddy
+        - Self-hosted behind my own reverse proxy
+        - Hosted service
+        - Local development
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Logs, browser console, site timezone and period
+      description: |
+        For dashboard bugs, the browser and any console errors. For numbers that look wrong, the site's timezone and the period you were viewing; most "wrong" numbers turn out to be timezone or deduplication questions. Paste `docker compose logs api --tail 100` for server errors. Remove anything private.
+      render: shell

@@ -1,0 +1,14 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Packages allowed to run install scripts. sharp powers next/image
+# optimisation, unrs-resolver backs eslint's module resolution, and
+# @prisma/engines downloads the schema engine `prisma migrate` needs; without
+# it Prisma fetches the engine lazily on first use, which fails inside the
+# Docker image where node_modules is read-only for the runtime user. Without
+# this list pnpm refuses the install with ERR_PNPM_IGNORED_BUILDS.
+onlyBuiltDependencies:
+  - "@prisma/engines"
+  - sharp
+  - unrs-resolver

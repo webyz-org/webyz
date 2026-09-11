@@ -1,0 +1,31 @@
+<!--
+  ClickHouse server overrides for a single-node Webyz install, mounted into
+  /etc/clickhouse-server/config.d/. The defaults are tuned for clusters and
+  keep several internal log tables (every query, every thread, every metric
+  sample) that grow by gigabytes on a small server and are never read by
+  Webyz. Warning-level logging keeps `docker compose logs clickhouse` useful.
+-->
+<clickhouse>
+    <logger>
+        <level>warning</level>
+        <console>true</console>
+    </logger>
+
+    <query_log remove="remove"/>
+    <query_thread_log remove="remove"/>
+    <query_views_log remove="remove"/>
+    <part_log remove="remove"/>
+    <text_log remove="remove"/>
+    <trace_log remove="remove"/>
+    <metric_log remove="remove"/>
+    <asynchronous_metric_log remove="remove"/>
+    <session_log remove="remove"/>
+    <processors_profile_log remove="remove"/>
+
+    <!-- Only the API talks to ClickHouse, over the private compose network. -->
+    <listen_host>0.0.0.0</listen_host>
+
+    <!-- 500 MB of mark cache instead of the 5 GB default; plenty for the
+         event volumes a single server handles. -->
+    <mark_cache_size>524288000</mark_cache_size>
+</clickhouse>

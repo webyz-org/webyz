@@ -1,0 +1,25 @@
+<!--
+  Backup destination for the hosted ClickHouse, mounted into
+  /etc/clickhouse-server/config.d/ by docker-compose.hosted.yml on top of the
+  open-source stack's config.xml (which stays untouched).
+
+  infra/hosted/backup.sh runs `BACKUP DATABASE webyz_analytics TO
+  Disk('backups', ...)`: an online, consistent snapshot while the API keeps
+  writing, so nightly backups cost no downtime and lose no events. The disk is
+  the `chbackups` volume; the script copies each archive out to BACKUP_DIR and
+  removes it from the volume, so the volume only ever holds the one in flight.
+-->
+<clickhouse>
+    <storage_configuration>
+        <disks>
+            <backups>
+                <type>local</type>
+                <path>/backups/</path>
+            </backups>
+        </disks>
+    </storage_configuration>
+    <backups>
+        <allowed_disk>backups</allowed_disk>
+        <allowed_path>/backups/</allowed_path>
+    </backups>
+</clickhouse>

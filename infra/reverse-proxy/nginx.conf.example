@@ -1,0 +1,66 @@
+# Webyz behind your own nginx, with the stack started as
+#   docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d
+# which publishes the API on 127.0.0.1:3042 and the dashboard on 127.0.0.1:3041.
+#
+# One domain, routed by path: /api/*, /js/* and /health* go to the API,
+# everything else to the dashboard. Replace analytics.example.com and add your
+# TLS directives (or keep them in the include your setup already uses).
+#
+# Header contract with the API: TRUST_PROXY=1 means it trusts the one address
+# nginx appends to X-Forwarded-For and ignores anything the client sent before
+# it. Keep $proxy_add_x_forwarded_for. If another proxy sits in front of nginx,
+# set TRUST_PROXY=2 in .env or list the proxies' addresses.
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ""      close;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name analytics.example.com;
+    # ssl_certificate     /etc/letsencrypt/live/analytics.example.com/fullchain.pem;
+    # ssl_certificate_key /etc/letsencrypt/live/analytics.example.com/privkey.pem;
+
+    # Realtime dashboard stream: server-sent events must not be buffered or
+    # timed out at the usual 60 seconds.
+    location ~ ^/api/v1/[^/]+/realtime/stream$ {
+        proxy_pass http://127.0.0.1:3042;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 1h;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # API, tracker script, health. Tracker payloads are small.
+    location ~ ^/(api/|js/|health) {
+        client_max_body_size 64k;
+        proxy_pass http://127.0.0.1:3042;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+    }
+
+    # Dashboard.
+    location / {
+        proxy_pass http://127.0.0.1:3041;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+server {
+    listen 80;
+    server_name analytics.example.com;
+    return 301 https://$host$request_uri;
+}

@@ -1,0 +1,177 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Build-time values for the front ends. CI builds only check that the apps
+  # compile; the real values are baked in by the Docker builds at deploy time.
+  VITE_API_BASE_URL: http://localhost:3042
+  VITE_MARKETING_URL: http://localhost:3040
+  NEXT_PUBLIC_APP_URL: http://localhost:3041
+  NEXT_PUBLIC_API_BASE_URL: http://localhost:3042
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  checks:
+    name: Lint, typecheck, build, test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: webyz
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d webyz"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.8-alpine
+        env:
+          CLICKHOUSE_DB: webyz_analytics
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ""
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+        ports: ["8123:8123"]
+        options: >-
+          --health-cmd "wget -qO- http://127.0.0.1:8123/ping || exit 1"
+          --health-interval 5s --health-timeout 5s --health-retries 24
+          --ulimit nofile=262144:262144
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # Version comes from "packageManager" in the root package.json.
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter backend prisma:generate
+        env:
+          DATABASE_URL: postgresql://postgres:password@localhost:5432/webyz
+
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm build
+
+      - name: Apply migrations and seed
+        working-directory: apps/api
+        run: pnpm run migrate:deploy
+        env:
+          DATABASE_URL: postgresql://postgres:password@localhost:5432/webyz
+          CLICKHOUSE_URL: http://localhost:8123
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ""
+
+      - name: API tests (unit and database)
+        working-directory: apps/api
+        run: pnpm test
+        env:
+          RUN_DB_TESTS: "1"
+          DATABASE_URL: postgresql://postgres:password@localhost:5432/webyz
+          CLICKHOUSE_URL: http://localhost:8123
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ""
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: "6379"
+          TRUST_PROXY: "false"
+
+  # Self-hosters pull these. Pushed on every push to main (tag `latest` and the
+  # short sha) and on version tags (`v1.2.3` becomes `1.2.3`, `1.2` and `latest`).
+  # The dashboard image needs no build arguments: it talks to the API on its own
+  # origin unless VITE_API_BASE_URL is baked in, which self-hosting never needs.
+  images:
+    name: Docker images
+    needs: checks
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - name: webyz-api
+            file: apps/api/Dockerfile
+          - name: webyz-app
+            file: apps/app/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.name }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
+
+  # The marketing site is the hosted product's own; built to prove it compiles,
+  # never published.
+  marketing-image:
+    name: Marketing image builds
+    needs: checks
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/web/Dockerfile
+          push: false
+          build-args: |
+            NEXT_PUBLIC_SITE_URL=https://www.example.com
+            NEXT_PUBLIC_APP_URL=https://app.example.com
+            NEXT_PUBLIC_API_BASE_URL=https://api.example.com
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
