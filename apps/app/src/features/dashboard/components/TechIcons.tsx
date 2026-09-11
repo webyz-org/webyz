@@ -149,6 +149,8 @@ const BROWSERS: [RegExp, ReactElement][] = [
 
 const SYSTEMS: [RegExp, ReactElement][] = [
   [/windows/i, WINDOWS],
+  // Chrome OS carries the Chrome mark; tested before the Apple row so nothing else claims it.
+  [/chrom/i, logo(chromeLogo, "Chrome OS")],
   [/ubuntu/i, glyph(siUbuntu)],
   [/mac|ios|ipad|iphone/i, glyph(siApple, MONO)],
   [/android/i, glyph(siAndroid)],

@@ -6,7 +6,7 @@ All notable changes to Webyz are recorded here. The format follows [Keep a Chang
 
 ### Added
 
-- Browser logos for the in-app and Android OEM browsers that were showing a placeholder: Facebook, Instagram, X (Twitter), TikTok, WeChat, the Google app (GSA), Vivo, HeyTap (OPPO), MIUI, Huawei, UC, Yandex, Vivaldi, DuckDuckGo, Ecosia, WebKit and the Android browser.
+- Browser logos for the in-app and Android OEM browsers that were showing a placeholder: Facebook, Instagram, X (Twitter), TikTok, WeChat, the Google app (GSA), Vivo, HeyTap (OPPO), MIUI, Huawei, UC, Yandex, Vivaldi, DuckDuckGo, Ecosia, WebKit and the Android browser, and the Chrome OS platform.
 - Filter operators: every dashboard filter takes `is`, `is not`, `contains` or `does not contain` (`f.page=!~/admin` on the API), plus new `event` and `goal` filters and `screen`/`language` dimensions. Sessions now store screen size and browser language (ClickHouse migration 009); rows from before show as empty.
 - Custom event properties: clicking a custom event on the dashboard filters to it and opens a Properties tab (`GET /:siteId/custom-events/properties`) listing keys and, per key, values by visitors.
 - Tracker: `data-hash-routing`, `data-outbound-links`, `data-file-downloads` (`data-file-types`) and `data-track-404` (with `<meta name="webyz-404">`) send the well-known `Outbound Link: Click`, `File Download` and `404` events with no code.
