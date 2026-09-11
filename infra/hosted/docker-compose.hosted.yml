@@ -71,7 +71,7 @@ services:
         NEXT_PUBLIC_SITE_URL: ${MARKETING_ORIGIN}
         NEXT_PUBLIC_APP_URL: ${APP_ORIGIN}
         NEXT_PUBLIC_API_BASE_URL: ${API_ORIGIN}
-        NEXT_PUBLIC_GITHUB_URL: ${GITHUB_URL:-https://github.com/nihalnclt/webyz}
+        NEXT_PUBLIC_GITHUB_URL: ${GITHUB_URL:-https://github.com/webyz-org/webyz}
     container_name: webyz-web
     restart: unless-stopped
     logging: *logging

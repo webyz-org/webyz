@@ -45,7 +45,7 @@ The tracker sets no cookies and writes nothing to the browser. Visitors are coun
 You need a Linux server with Docker, and a domain pointing at it.
 
 ```bash
-git clone https://github.com/nihalnclt/webyz.git
+git clone https://github.com/webyz-org/webyz.git
 cd webyz/infra
 ./setup.sh analytics.example.com
 docker compose up -d

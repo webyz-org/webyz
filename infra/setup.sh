@@ -59,7 +59,7 @@ REGISTRATION=disabled
 EMAIL_VERIFICATION=auto
 
 # Images: prebuilt from the registry, or build locally with 'docker compose build'.
-IMAGE_REGISTRY=ghcr.io/nihalnclt
+IMAGE_REGISTRY=ghcr.io/webyz-org
 IMAGE_TAG=latest
 
 # Optional. Empty means off. See docs/self-hosting.md for what each enables.

@@ -7,7 +7,7 @@ Node 22 or newer, pnpm 10 (the repo pins the exact version through `packageManag
 ## Run it locally
 
 ```bash
-git clone https://github.com/nihalnclt/webyz.git && cd webyz
+git clone https://github.com/webyz-org/webyz.git && cd webyz
 pnpm install
 docker compose up -d                 # postgres 5442, clickhouse 8123, redis 6382
 ```

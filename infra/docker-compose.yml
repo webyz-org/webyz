@@ -125,7 +125,7 @@ services:
       retries: 12
 
   migrate:
-    image: ${IMAGE_REGISTRY:-ghcr.io/nihalnclt}/webyz-api:${IMAGE_TAG:-latest}
+    image: ${IMAGE_REGISTRY:-ghcr.io/webyz-org}/webyz-api:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
@@ -139,7 +139,7 @@ services:
       clickhouse: { condition: service_healthy }
 
   api:
-    image: ${IMAGE_REGISTRY:-ghcr.io/nihalnclt}/webyz-api:${IMAGE_TAG:-latest}
+    image: ${IMAGE_REGISTRY:-ghcr.io/webyz-org}/webyz-api:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
@@ -156,7 +156,7 @@ services:
       redis: { condition: service_healthy }
 
   app:
-    image: ${IMAGE_REGISTRY:-ghcr.io/nihalnclt}/webyz-app:${IMAGE_TAG:-latest}
+    image: ${IMAGE_REGISTRY:-ghcr.io/webyz-org}/webyz-app:${IMAGE_TAG:-latest}
     build:
       context: ..
       dockerfile: apps/app/Dockerfile

@@ -11,7 +11,7 @@ One server, one domain, one command. The stack is Postgres, ClickHouse and Redis
 ## Install
 
 ```bash
-git clone https://github.com/nihalnclt/webyz.git
+git clone https://github.com/webyz-org/webyz.git
 cd webyz/infra
 ./setup.sh analytics.example.com
 docker compose up -d
@@ -66,7 +66,7 @@ docker compose up -d
 
 ## Build the images yourself
 
-Prebuilt images are published to `ghcr.io/nihalnclt/webyz-api` and `webyz-app` by CI on every release, tagged `latest` and by version. To run your own changes, or if you would rather not pull from a registry:
+Prebuilt images are published to `ghcr.io/webyz-org/webyz-api` and `webyz-app` by CI on every release, tagged `latest` and by version. To run your own changes, or if you would rather not pull from a registry:
 
 ```bash
 docker compose build

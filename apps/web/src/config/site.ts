@@ -19,4 +19,4 @@ export const LOGIN_URL = `${APP_URL}/login`;
  * this checkout's git remote; override per deployment if that changes.
  */
 export const GITHUB_URL =
-  process.env.NEXT_PUBLIC_GITHUB_URL ?? "https://github.com/nihalnclt/webyz";
+  process.env.NEXT_PUBLIC_GITHUB_URL ?? "https://github.com/webyz-org/webyz";

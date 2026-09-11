@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
   - name: Security vulnerability
-    url: https://github.com/nihalnclt/webyz/blob/main/SECURITY.md
+    url: https://github.com/webyz-org/webyz/blob/main/SECURITY.md
     about: Report privately by email, never in a public issue.
   - name: Self-hosting help
-    url: https://github.com/nihalnclt/webyz/blob/main/docs/self-hosting.md
+    url: https://github.com/webyz-org/webyz/blob/main/docs/self-hosting.md
     about: The guide covers install, configuration, updates and troubleshooting. Open a bug if it is wrong.
