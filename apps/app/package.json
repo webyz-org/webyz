@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@browser-logos/android-webview": "^1.0.2",
     "@browser-logos/brave": "^3.0.13",
     "@browser-logos/chrome": "^2.0.0",
     "@browser-logos/edge": "^2.0.7",
@@ -17,6 +18,10 @@
     "@browser-logos/opera": "^1.1.11",
     "@browser-logos/safari": "^2.1.0",
     "@browser-logos/samsung-internet": "^4.0.6",
+    "@browser-logos/uc": "^1.1.0",
+    "@browser-logos/vivaldi": "^2.1.10",
+    "@browser-logos/webkit": "^1.0.10",
+    "@browser-logos/yandex": "^1.0.8",
     "@hookform/resolvers": "^5.2.2",
     "@tailwindcss/vite": "^4.2.0",
     "@tanstack/react-query": "^5.90.21",

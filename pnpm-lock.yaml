@@ -123,6 +123,9 @@ importers:
 
   apps/app:
     dependencies:
+      '@browser-logos/android-webview':
+        specifier: ^1.0.2
+        version: 1.0.2
       '@browser-logos/brave':
         specifier: ^3.0.13
         version: 3.0.13
@@ -144,6 +147,18 @@ importers:
       '@browser-logos/samsung-internet':
         specifier: ^4.0.6
         version: 4.0.6
+      '@browser-logos/uc':
+        specifier: ^1.1.0
+        version: 1.1.0
+      '@browser-logos/vivaldi':
+        specifier: ^2.1.10
+        version: 2.1.10
+      '@browser-logos/webkit':
+        specifier: ^1.0.10
+        version: 1.0.10
+      '@browser-logos/yandex':
+        specifier: ^1.0.8
+        version: 1.0.8
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.4.0(react-hook-form@7.78.0(react@19.2.3))
@@ -456,6 +471,9 @@ packages:
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
 
+  '@browser-logos/android-webview@1.0.2':
+    resolution: {integrity: sha512-vHmYjHqi3PX3PyTGVHesWLYnTg2WL2dYCy/xy2+YsNMUUjiAo934efuxC+shh9i09dkv7L8bcWrZl+ACshFkXg==}
+
   '@browser-logos/brave@3.0.13':
     resolution: {integrity: sha512-Dvd3INXrmtenzdDRl0QFL5UFiK+Rg/225dYzMevczfTdNBzuA5Z6w8OO8btTrQ7BLez6zl9JaicNhVakusKqsg==}
 
@@ -476,6 +494,18 @@ packages:
 
   '@browser-logos/samsung-internet@4.0.6':
     resolution: {integrity: sha512-Bvm5ROZACQQYlCyDkesuA67xelUgE1/SdCvrRDT9qwsgteGVC2HcxTqrf8g6GeErD/7EzOZfiCmOm5YAa906qQ==}
+
+  '@browser-logos/uc@1.1.0':
+    resolution: {integrity: sha512-3PpmX+/gE2Th92Ehh5zdP5tcgVyC8dSdf44viBixGd/mtU493kDv1ujDbmtNx/FHTMuFpmlc8pRzqcp1UPpYFg==}
+
+  '@browser-logos/vivaldi@2.1.10':
+    resolution: {integrity: sha512-1UOTvxWR4e172SqF01qGKVgQriQTzQigIdY+MwxKarBvK/jyExkyQFDx146I/0ICPvlB6Z4upFiNJJiA6DpapQ==}
+
+  '@browser-logos/webkit@1.0.10':
+    resolution: {integrity: sha512-InDyaXYwVmRvGfQGeRik9391MrKNXvTZkG/IPkeVWNDb3w/fgcg2FM5164kRsXw36JoLUoA7MvH+g4XOBeHi9A==}
+
+  '@browser-logos/yandex@1.0.8':
+    resolution: {integrity: sha512-M7IvQ1+F2Zd8oVY+ccTf38BBvEFUpLSX3njaY1ty/X/PY4EgIwh9Gn2qi89x6nHOxhOfvC3wRTaUeEQYvCNLKg==}
 
   '@clickhouse/client-common@1.20.0':
     resolution: {integrity: sha512-s0oDSwxQyJO/Xwne6sNE7xTAlms72Hq2AHzHAB9oSOBfiaXTzQOyHQrhufJ9ldPJTwr4L47/RxG1i6I0I8Xy9A==}
@@ -5813,6 +5843,8 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
+  '@browser-logos/android-webview@1.0.2': {}
+
   '@browser-logos/brave@3.0.13': {}
 
   '@browser-logos/chrome@2.0.0': {}
@@ -5826,6 +5858,14 @@ snapshots:
   '@browser-logos/safari@2.1.0': {}
 
   '@browser-logos/samsung-internet@4.0.6': {}
+
+  '@browser-logos/uc@1.1.0': {}
+
+  '@browser-logos/vivaldi@2.1.10': {}
+
+  '@browser-logos/webkit@1.0.10': {}
+
+  '@browser-logos/yandex@1.0.8': {}
 
   '@clickhouse/client-common@1.20.0': {}
 
