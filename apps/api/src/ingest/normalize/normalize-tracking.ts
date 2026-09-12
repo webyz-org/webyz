@@ -7,7 +7,7 @@ import { extractHostname } from "../../utils/hostname.js";
 import { isBot } from "../../utils/bot-detection.js";
 import { isDatacenterIp } from "../../core/bots/datacenter-ips.js";
 import { isSpamReferrer } from "../../core/bots/referrer-spam.js";
-import { isFlaggedCluster } from "../../core/bots/clusters.js";
+import { clusterFilterApplies, isFlaggedCluster } from "../../core/bots/clusters.js";
 import { recordDrop, type DropReason } from "../../core/bots/drops.js";
 import { BOT_CLUSTER_FILTER, BOT_DATACENTER_FILTER } from "../../config/env.js";
 import { normalizeUtm } from "../helpers/utm.js";
@@ -49,6 +49,7 @@ export const normalizeTracking = async (
 
   if (
     BOT_CLUSTER_FILTER &&
+    clusterFilterApplies(payload.t, payload.screen || "", payload.lang || "") &&
     (await isFlaggedCluster(
       request.ctx.redis,
       payload.sid,

@@ -36,6 +36,25 @@ export const CLUSTER_MIN_VISITORS = 20;
 export const CLUSTER_MIN_BOUNCE_SHARE = 0.95;
 export const SITE_MIN_ENGAGED_SESSIONS = 30;
 
+/**
+ * Whether a request can be judged against a flag at all.
+ *
+ * The flag is keyed on (screen, browser family, language), and only a
+ * pageview carries those: the tracker's engagement reports and custom events
+ * send neither screen nor language, so judging them would compare the empty
+ * key `"|Chrome|"` against the flags. A group with no screen and no language
+ * is not a signature either, it is "every visitor of this browser whose
+ * script did not report dimensions" (the pixel fallback), so such a group is
+ * never flagged and never matched. Dropping the visit's pageview is enough:
+ * without a session a later engagement writes nothing, which is how
+ * Plausible discards an engagement with no session.
+ */
+export const clusterFilterApplies = (
+  eventType: string,
+  screen: string,
+  language: string,
+): boolean => eventType === "pageview" && screen !== "" && language !== "";
+
 export type ClusterRow = {
   website_id: string;
   screen: string;
@@ -55,6 +74,7 @@ export const flagKey = (websiteId: string, key: string) => `bots:cluster:${websi
 
 /** Pure decision, for tests: does this group look scripted? */
 export const isScriptedCluster = (row: ClusterRow): boolean =>
+  clusterFilterApplies("pageview", row.screen, row.language) &&
   row.visits >= CLUSTER_MIN_VISITS &&
   row.visitors >= CLUSTER_MIN_VISITORS &&
   row.engaged === 0 &&
@@ -90,6 +110,7 @@ export const findClusterCandidates = async (clickhouse: ClickHouseClient): Promi
         AND website_id IN engaged_sites
       GROUP BY website_id, screen, browser_family, language
       HAVING visits >= {minVisits:UInt32} AND visitors >= {minVisitors:UInt32}
+        AND screen != '' AND language != ''
     `,
     query_params: {
       window: CLUSTER_WINDOW_MINUTES,
