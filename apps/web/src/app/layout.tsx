@@ -62,7 +62,31 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={dmSans.variable + " " + caveat.variable}>
-      <body className="font-sans">{children}</body>
+      <body className="font-sans">
+        {children}
+        {/*
+          We measure webyz.io with Webyz. Both attributes are required: the
+          tracker reads them off its own tag and sends nothing without either
+          (apps/api/public/js/script.js, config.siteId / config.endPoint).
+          Pointed at the production API directly, so a local or preview build
+          reports into the same site; localhost is not sent either way, since
+          data-track-localhost is off by default.
+
+          A plain tag, not next/script: in the App Router every next/script
+          strategy defers to client-side injection (afterInteractive leaves it
+          in the RSC payload, beforeInteractive becomes a __next_s bootstrap
+          entry), so neither ships a real tag in the HTML and both lose the
+          visitor who leaves before hydration. Paid traffic is full of exactly
+          those fast bounces. Rendered here it serializes into the served HTML
+          the same way the install snippet does on any other site.
+        */}
+        <script
+          src="https://api.webyz.io/js/script.js"
+          data-site-id="ca29e39b-d5b4-4191-8965-36f55d7bd609"
+          data-endpoint="https://api.webyz.io/api/v1/track"
+          defer
+        />
+      </body>
     </html>
   );
 }
