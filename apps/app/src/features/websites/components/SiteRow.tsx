@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { ArrowDownRight, ArrowUpRight, Minus, Settings } from "lucide-react";
 
+import SiteFavicon from "./SiteFavicon";
 import Sparkline from "../../dashboard/components/Sparkline";
 import {
   useMainGraph,
@@ -112,14 +113,7 @@ export default function SiteRow({
       <div className="flex flex-col gap-5 p-4 lg:flex-row lg:items-center lg:gap-6 lg:p-5">
         {/* Identity */}
         <div className="flex min-w-0 flex-1 items-center gap-3.5">
-          <span
-            className={
-              "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-base font-bold uppercase " +
-              tone
-            }
-          >
-            {site.domain[0]}
-          </span>
+          <SiteFavicon domain={site.domain} tone={tone} />
 
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-2">

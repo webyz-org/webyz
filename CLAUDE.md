@@ -368,6 +368,16 @@ placeholder text there flashes before React mounts.
   fixed regardless of tab count.
 - React Compiler is on via `babel-plugin-react-compiler`; avoid manual
   memoization unless profiling says otherwise.
+- The website list and the header's site switcher show each site's own favicon
+  (`SiteFavicon`, sizes `md` and `sm`), falling back to the coloured initial
+  tile when there is none. The image comes from
+  `GET /api/v1/favicon/:domain` (`core/website/favicon.service.ts`), which
+  fetches from DuckDuckGo and then Google, caches the bytes in Redis for a
+  week and a miss for a day, and answers 404 so the tile stays. The browser
+  never calls an icon service itself: that would hand a third party the
+  signed-in user's whole list of domains. The route is public because the
+  dashboard loads it as an `<img>` and, on the hosted split-host setup, a
+  cross-site image request carries no `SameSite=Lax` session cookie.
 
 ## Frontend (apps/web)
 

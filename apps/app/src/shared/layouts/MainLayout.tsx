@@ -23,6 +23,7 @@ import {
   useSiteByDomain,
   useWebsites,
 } from "../../features/websites/hooks/useWebsite";
+import SiteFavicon from "../../features/websites/components/SiteFavicon";
 import ThemeToggle from "../components/ThemeToggle";
 import ErrorBoundary from "../components/ErrorBoundary";
 import SessionWatcher from "../components/SessionWatcher";
@@ -71,6 +72,9 @@ export default function MainLayout() {
   };
 
   const inSiteContext = Boolean(domain);
+  // The URL's domain stands in until the site list resolves, so the switcher
+  // can ask for the icon on the first paint rather than after a round trip.
+  const siteDomain = inSiteContext ? (site?.domain ?? domain) : undefined;
   const siteBase = site ? `/sites/${site.domain}` : undefined;
 
   // Plan-gated sections stay listed until the plan is known, then drop out if
@@ -157,13 +161,17 @@ export default function MainLayout() {
                 type="button"
                 className="flex h-8 max-w-64 items-center gap-2 rounded-md px-2 text-[13.5px] transition-colors duration-150 hover:bg-black/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 dark:hover:bg-white/[0.06]"
               >
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary-soft text-[11px] font-semibold uppercase text-brand-ink">
-                  {inSiteContext ? (
-                    (site?.domain ?? domain ?? "?")[0]
-                  ) : (
+                {siteDomain ? (
+                  <SiteFavicon
+                    domain={siteDomain}
+                    tone="bg-primary-soft text-brand-ink"
+                    size="sm"
+                  />
+                ) : (
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary-soft text-[11px] font-semibold uppercase text-brand-ink">
                     <Globe2 size={12} />
-                  )}
-                </span>
+                  </span>
+                )}
                 <span className="truncate font-medium text-text-primary">
                   {inSiteContext ? (site?.name ?? domain) : "All websites"}
                 </span>
