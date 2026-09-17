@@ -134,18 +134,31 @@ export const nextThresholdCrossed = (
   return crossed.length ? Math.max(...crossed) : null;
 };
 
+/** One hour in milliseconds. Buckets are hourly, so this is everywhere. */
+export const HOUR_MS = 3_600_000;
+
 /** Floor a date to the start of its UTC hour. */
 export const startOfHour = (d: Date): Date => {
   const ms = d.getTime();
-  return new Date(ms - (ms % 3_600_000));
+  return new Date(ms - (ms % HOUR_MS));
 };
 
 export type HourRow = { hour: Date; count: number };
 
 /**
  * Split hourly counts into closed buckets (hours fully in the past) and the
- * live count for the current hour. Hours outside the period are dropped: a
- * ClickHouse row on the period end boundary belongs to the next period.
+ * live count for the current hour. Hours that do not overlap the period are
+ * dropped: a ClickHouse row on the period end boundary belongs to the next
+ * period.
+ *
+ * A period rarely starts on the hour, so its first hour is usually partial.
+ * The rows come from a query bounded by the period itself, so that bucket
+ * holds only in-period events and must be kept: comparing the hour's *start*
+ * against `periodStart` would discard it and silently lose everything from
+ * `periodStart` to the end of that hour, up to an hour of billable traffic
+ * every period. The same hour can therefore appear in two adjacent periods,
+ * each holding its own half, which is why a bucket is unique per period and
+ * not per subscription.
  */
 export const splitHourRows = (
   rows: readonly HourRow[],
@@ -159,7 +172,9 @@ export const splitHourRows = (
 
   for (const row of rows) {
     const t = row.hour.getTime();
-    if (t < periodStart.getTime() || t >= periodEnd.getTime()) continue;
+    // Overlap, not containment: keep the hour when any part of it is inside
+    // [periodStart, periodEnd).
+    if (t + HOUR_MS <= periodStart.getTime() || t >= periodEnd.getTime()) continue;
     if (t < currentHour) closed.push(row);
     else if (t === currentHour) live += row.count;
     // t > currentHour: future-dated events are ignored until their hour arrives.

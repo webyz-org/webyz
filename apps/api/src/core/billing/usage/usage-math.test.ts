@@ -134,6 +134,74 @@ test("hour rows: period boundaries are [start, end), current hour is live, futur
   assert.equal(sumCounts(closed) + live, 35);
 });
 
+test("hour rows: a period starting mid-hour keeps that hour's partial bucket", () => {
+  // The rows come from a query bounded by the period, so the 10:00 bucket holds
+  // only events at or after 10:18:14. Judging it by its start would drop
+  // everything from 10:18:14 to 11:00 out of the period's total.
+  const periodStart = new Date("2026-09-05T10:18:14.287Z");
+  const periodEnd = new Date("2026-10-05T10:18:14.287Z");
+  const now = new Date("2026-09-06T12:00:00Z");
+  const rows = [
+    { hour: new Date("2026-09-05T09:00:00Z"), count: 999 }, // ends at 10:00, before the period
+    { hour: new Date("2026-09-05T10:00:00Z"), count: 3_900 }, // the partial first hour
+    { hour: new Date("2026-09-05T11:00:00Z"), count: 40 },
+  ];
+  const { closed, live } = splitHourRows(rows, periodStart, periodEnd, now);
+  assert.deepEqual(closed.map((r) => r.count), [3_900, 40]);
+  assert.equal(live, 0);
+  assert.equal(sumCounts(closed), 3_940);
+});
+
+test("hour rows: two adjacent periods each keep their half of the boundary hour", () => {
+  // Rollover at 10:18:14. The closing period owns [10:00, 10:18:14) and the
+  // opening one [10:18:14, 11:00); both surface a 10:00 bucket, which is why a
+  // bucket is unique per period rather than per subscription.
+  const boundary = new Date("2026-10-05T10:18:14.287Z");
+  const now = new Date("2026-10-05T23:00:00Z");
+  const boundaryHour = new Date("2026-10-05T10:00:00Z");
+
+  const closing = splitHourRows(
+    [{ hour: boundaryHour, count: 11 }],
+    new Date("2026-09-05T10:18:14.287Z"),
+    boundary,
+    now,
+  );
+  const opening = splitHourRows(
+    [{ hour: boundaryHour, count: 22 }],
+    boundary,
+    new Date("2026-11-05T10:18:14.287Z"),
+    now,
+  );
+
+  assert.equal(sumCounts(closing.closed), 11);
+  assert.equal(sumCounts(opening.closed), 22);
+});
+
+test("hour rows: an hour ending exactly at period start is still dropped", () => {
+  const periodStart = new Date("2026-09-05T10:00:00Z");
+  const { closed } = splitHourRows(
+    [{ hour: new Date("2026-09-05T09:00:00Z"), count: 999 }],
+    periodStart,
+    new Date("2026-10-05T10:00:00Z"),
+    new Date("2026-09-06T12:00:00Z"),
+  );
+  assert.deepEqual(closed, []);
+});
+
+test("threshold ladder: 1.0 is crossed once and never re-reported", () => {
+  const ladder = [0.8, 0.9, 1.0];
+  // The hard-limit branch of enforcement advances the pointer to 1.0; without
+  // that, every later run would re-report the 100% crossing.
+  assert.equal(nextThresholdCrossed(1.0006, ladder, 0.9), 1.0);
+  assert.equal(nextThresholdCrossed(1.0006, ladder, 1.0), null);
+  assert.equal(nextThresholdCrossed(3.5, ladder, 1.0), null);
+  // A first sighting already over the allowance reports 100%, not 80%.
+  assert.equal(nextThresholdCrossed(1.5, ladder, null), 1.0);
+  // A zero allowance drives the ratio to Infinity; still one 100% report.
+  assert.equal(nextThresholdCrossed(Infinity, ladder, null), 1.0);
+  assert.equal(nextThresholdCrossed(Infinity, ladder, 1.0), null);
+});
+
 test("startOfHour floors to the UTC hour", () => {
   assert.equal(
     startOfHour(new Date("2026-09-06T12:34:56.789Z")).toISOString(),

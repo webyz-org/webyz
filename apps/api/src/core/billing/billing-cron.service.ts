@@ -1,7 +1,7 @@
 import { clickhouse } from "../../lib/clickhouse.js";
 import prisma from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
-import { aggregatePeriod, ensureOpenPeriod } from "./usage/aggregation.service.js";
+import { aggregatePeriod, closeStrandedPeriods, ensureOpenPeriod } from "./usage/aggregation.service.js";
 import { nextThresholdCrossed } from "./usage/usage-math.js";
 import { resolveSpendCap, usageWithCap } from "./spend-cap/spend-cap.service.js";
 import { notifyOnce } from "./notifications/notification.service.js";
@@ -67,7 +67,12 @@ export async function syncUsageFromClickhouse(): Promise<void> {
     }
   }
 
-  console.log(`[sync-usage] Done — ${synced} synced, ${failed} failed`);
+  const stranded = await closeStrandedPeriods({ prisma });
+
+  console.log(
+    `[sync-usage] Done — ${synced} synced, ${failed} failed` +
+      (stranded ? `, ${stranded} stranded period(s) closed` : ""),
+  );
 }
 
 // Overage reporting moved to reporting/usage-reporting.service.ts (hourly deltas).
@@ -159,19 +164,37 @@ async function checkPeriod(period: any): Promise<{
     warned = await sendWarningsIfNeeded(period, subscription, usageRatio);
     await sendSpendCapEmails(period, subscription);
   } else if (usageRatio >= 1.0) {
-    // Sent once per period, on first crossing the allowance.
-    const outcome = await notifyOnce(ctx, {
-      subscriptionId: subscription.id,
-      kind: "usage_100",
-      scopeKey: period.id,
-      message: overQuotaEmail(user.email, {
-        name: user.name,
-        planName: plan.name,
-        totalEvents: Number(totalEvents),
-        eventLimit: included,
-      }),
-    });
-    warned = outcome === "sent";
+    // A hard-limit plan at its allowance gets the "tracking is paused" email
+    // instead of the generic threshold warning. The escalation pointer still
+    // has to move: left behind at 0.9 it would claim the customer has not been
+    // told they are over, and every later run of this job would re-attempt the
+    // send only to be deduplicated by the notifications table.
+    const crossed = nextThresholdCrossed(
+      usageRatio,
+      thresholdsFor(subscription),
+      period.lastWarnedThreshold ?? null,
+    );
+    if (crossed !== null) {
+      const outcome = await notifyOnce(ctx, {
+        subscriptionId: subscription.id,
+        kind: "usage_100",
+        scopeKey: period.id,
+        message: overQuotaEmail(user.email, {
+          name: user.name,
+          planName: plan.name,
+          totalEvents: Number(totalEvents),
+          eventLimit: included,
+        }),
+      });
+      // Advance only once the send did not fail. `notifyOnce` deletes its claim
+      // row when delivery fails so the next run can retry, and the retry only
+      // happens if this branch is entered again, which the pointer would
+      // prevent. Moving it afterwards cannot double-send: if the process dies
+      // between a successful send and this write, the surviving claim row
+      // answers "duplicate" next run.
+      if (outcome !== "failed") await advanceWarnedThreshold(period.id, crossed);
+      warned = outcome === "sent";
+    }
   } else {
     warned = await sendWarningsIfNeeded(period, subscription, usageRatio);
   }
@@ -220,6 +243,17 @@ async function sendSpendCapEmails(period: any, subscription: any): Promise<void>
   }
 }
 
+/**
+ * Which warning ladder this subscription is on. Overage can only be billed
+ * when there is a provider subscription to bill, so a trial on a paid plan
+ * warns like Free.
+ */
+function thresholdsFor(subscription: any): readonly number[] {
+  const isPaygPlan =
+    subscription.plan.overagePricePer1k !== null && subscription.providerSubscriptionId !== null;
+  return isPaygPlan ? BILLING_CONFIG.usage.warnThresholds.paid : BILLING_CONFIG.usage.warnThresholds.free;
+}
+
 async function sendWarningsIfNeeded(
   period: any,
   subscription: any,
@@ -229,17 +263,9 @@ async function sendWarningsIfNeeded(
 
   // The highest threshold crossed since the last email: a customer seen first
   // at 95% gets the 90% warning, not the 80% one.
-  const isPaygPlan = subscription.plan.overagePricePer1k !== null && subscription.providerSubscriptionId !== null;
-  const thresholds = isPaygPlan ? BILLING_CONFIG.usage.warnThresholds.paid : BILLING_CONFIG.usage.warnThresholds.free;
-  const nextThreshold = nextThresholdCrossed(usageRatio, thresholds, lastWarnedThreshold ?? null);
+  const nextThreshold = nextThresholdCrossed(usageRatio, thresholdsFor(subscription), lastWarnedThreshold ?? null);
 
   if (!nextThreshold) return false;
-
-  // Update the threshold first to prevent duplicate sends if email fails
-  await prisma.billingPeriodUsage.update({
-    where: { id: period.id },
-    data: { lastWarnedThreshold: nextThreshold },
-  });
 
   const user = subscription.user;
   const isPayg = subscription.plan.overagePricePer1k !== null && subscription.providerSubscriptionId !== null;
@@ -265,7 +291,23 @@ async function sendWarningsIfNeeded(
     },
   );
 
+  // Same rule as the over-quota branch: the pointer moves only once the send
+  // did not fail, or a bounced warning would never be retried.
+  if (outcome !== "failed") await advanceWarnedThreshold(period.id, nextThreshold);
+
   console.log(`[enforce-limits] usage warning ${kind} for ${user.email}: ${outcome}`);
 
-  return true;
+  return outcome === "sent";
+}
+
+/**
+ * Move the escalation pointer. The notifications table records what actually
+ * went out; this is only how far the ladder has been climbed, so it must never
+ * run ahead of a delivery that failed.
+ */
+async function advanceWarnedThreshold(periodId: string, threshold: number): Promise<void> {
+  await prisma.billingPeriodUsage.update({
+    where: { id: periodId },
+    data: { lastWarnedThreshold: threshold },
+  });
 }

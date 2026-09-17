@@ -6,6 +6,7 @@ import { assignFreePlan } from "../free-plan.service.js";
 import { notifyOnce } from "../notifications/notification.service.js";
 import { reconcileRestriction } from "../state/restriction.service.js";
 import { reconcileSitesToLimit } from "./site-limit.service.js";
+import { closeOpenPeriods } from "../usage/aggregation.service.js";
 import { paymentFailedEmail, paymentRecoveredEmail, planChangedEmail } from "../../email/templates/index.js";
 import type {
   BillingProvider,
@@ -195,6 +196,9 @@ export const syncSubscription = async (
     canceledAt: sub.canceledAt,
   };
 
+  // Rows this call retires, closed outside the transaction below.
+  const retiredIds: string[] = [];
+
   await prisma.$transaction(async (tx) => {
     const row = existing
       ? await tx.subscription.update({ where: { id: existing.id }, data })
@@ -205,10 +209,12 @@ export const syncSubscription = async (
     // One live subscription per user: the free or trial row this replaces is
     // retired. An incomplete checkout never reaches here, so a failed first
     // payment leaves the customer exactly where they were.
-    const displaced = await tx.subscription.findMany({
-      where: { userId, id: { not: row.id }, status: { in: LIVE }, providerSubscriptionId: { not: null } },
-      select: { providerSubscriptionId: true },
+    const retiring = await tx.subscription.findMany({
+      where: { userId, id: { not: row.id }, status: { in: LIVE } },
+      select: { id: true, providerSubscriptionId: true },
     });
+    retiredIds.push(...retiring.map((r) => r.id));
+    const displaced = retiring.filter((r) => r.providerSubscriptionId !== null);
     await tx.subscription.updateMany({
       where: { userId, id: { not: row.id }, status: { in: LIVE } },
       data: { status: "CANCELED", canceledAt: new Date() },
@@ -223,6 +229,14 @@ export const syncSubscription = async (
       );
     }
   });
+
+  // A retired row is never visited by the usage sync again, so settle its
+  // open period now rather than leave it frozen and unchargeable. Wall time,
+  // not `now`: `now` is the provider event's own timestamp, which is right for
+  // judging whether a deferred change is due but wrong here, because a
+  // redelivered webhook would back-date the close and clip the final
+  // aggregation to an hour that has long since passed.
+  for (const id of retiredIds) await closeOpenPeriods(ctx, id);
 
   // Status and grace changed above; the restriction decision follows from them
   // together with the cap and quota facts (state/restriction.ts).
@@ -269,6 +283,10 @@ export const endSubscription = async (ctx: AppContext, providerSubscriptionId: s
     console.warn(`[subscription] ended ${providerSubscriptionId}: no local row`);
     return;
   }
+  // Close the final period before the row stops being live, so the last
+  // stretch of usage is aggregated and settled rather than frozen OPEN on a
+  // subscription nothing visits again.
+  await closeOpenPeriods(ctx, sub.id);
   if (sub.status !== "CANCELED") {
     await prisma.subscription.update({
       where: { id: sub.id },

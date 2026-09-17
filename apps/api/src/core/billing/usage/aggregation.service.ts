@@ -4,6 +4,7 @@ import { parseEntitlements } from "../catalog/entitlements.schema.js";
 import { countBillableEventsByHour } from "./billable.js";
 import { applyPendingSpendCap } from "../spend-cap/spend-cap.service.js";
 import {
+  HOUR_MS,
   splitHourRows,
   startOfHour,
   sumCounts,
@@ -83,6 +84,142 @@ export const ensureOpenPeriod = async (
 };
 
 /**
+ * Close every OPEN period on a subscription that is being retired.
+ *
+ * The usage sync only visits live subscriptions, so an OPEN period left on a
+ * retired one is frozen at whatever the last hourly run wrote and is invisible
+ * to everything downstream: `chargeOverage` considers CLOSED periods only, and
+ * reconciliation walks closed periods.
+ *
+ * Cancellation paths call this directly, but not all of them can: a sync that
+ * finds the provider has already cancelled or paused the subscription takes an
+ * early return before it knows which rows it retired, and account deletion
+ * drops the rows entirely. `closeStrandedPeriods` below is the net that catches
+ * whatever a call site misses, so this is not the only way a period closes.
+ *
+ * Pass `clickhouse` to aggregate each period one final time first, so the
+ * stored total covers every event up to the moment it closes. That matters
+ * where the period can still be billed, which means a provider-backed
+ * subscription. A free or trial row has no card and no charge path, so its
+ * periods close at the last synced total and the caller need not hold a
+ * ClickHouse client to retire one.
+ *
+ * Safe to call twice: a period already CLOSED is not selected.
+ */
+export const closeOpenPeriods = async (
+  deps: Pick<AppContext, "prisma"> & Partial<Pick<AppContext, "clickhouse">>,
+  subscriptionId: string,
+  now: Date = new Date(),
+): Promise<{ closed: string[] }> => {
+  const { prisma, clickhouse } = deps;
+
+  const open = await prisma.billingPeriodUsage.findMany({
+    where: { subscriptionId, status: "OPEN" },
+    select: { id: true, periodStart: true, periodEnd: true, includedEvents: true },
+  });
+  if (open.length === 0) return { closed: [] };
+
+  const sub = clickhouse
+    ? await prisma.subscription.findUnique({
+        where: { id: subscriptionId },
+        select: {
+          id: true,
+          plan: { select: { entitlements: true } },
+          user: { select: { websites: { select: { id: true } } } },
+        },
+      })
+    : null;
+
+  const closed: string[] = [];
+  for (const period of open) {
+    if (clickhouse && sub) {
+      // The period's own dates drive the final aggregation, not the
+      // subscription's: those may already have been moved on by whatever is
+      // retiring it.
+      const ledgerSub: LedgerSubscription = {
+        id: sub.id,
+        currentPeriodStart: period.periodStart,
+        currentPeriodEnd: period.periodEnd,
+        plan: sub.plan,
+        user: sub.user,
+      };
+      // A cancellation lands mid-hour, inside a period whose end is still in
+      // the future, so the hour containing `now` would be treated as the live
+      // hour: counted into the total but never written as a bucket, leaving a
+      // CLOSED period whose total disagrees with its own buckets. Close the
+      // window at `now` and aggregate as if the next hour boundary had already
+      // passed, which flushes that partial hour into a bucket of its own.
+      const clippedEnd = new Date(Math.min(period.periodEnd.getTime(), now.getTime()));
+      const pastTheHour = new Date(startOfHour(now).getTime() + HOUR_MS);
+      try {
+        await aggregatePeriod(
+          { prisma, clickhouse },
+          { ...ledgerSub, currentPeriodEnd: clippedEnd },
+          { ...period, periodEnd: clippedEnd },
+          pastTheHour,
+        );
+      } catch (err) {
+        // Closing must not depend on the analytics store being reachable. A
+        // period left OPEN on a retired subscription is never charged at all,
+        // which is strictly worse than one closed at the last synced total, so
+        // close it and make the shortfall loud rather than silent: the stored
+        // total may be short by up to the time since the last hourly sync.
+        console.error(
+          `[usage] ANOMALY final aggregation failed for period ${period.id} on retired sub ${subscriptionId}; ` +
+            `closing at the last synced total, which may undercount: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+    await prisma.billingPeriodUsage.update({
+      where: { id: period.id },
+      data: { status: "CLOSED", closedAt: now },
+    });
+    closed.push(period.id);
+    console.log(`[usage] closed period ${period.id} on retired sub ${subscriptionId}`);
+  }
+
+  return { closed };
+};
+
+/**
+ * Safety net for periods left OPEN on a subscription that is no longer live.
+ *
+ * Every cancellation path closes its own periods, but that happens after the
+ * transaction that retires the row, so a crash in between would strand one
+ * where the hourly sync never looks again. Closing is deliberately done at the
+ * stored total with no final aggregation: by the time this runs the period is
+ * historical, and re-reading ClickHouse for a window the retention cut may
+ * have since trimmed could only move the total down.
+ */
+export const closeStrandedPeriods = async (
+  deps: Pick<AppContext, "prisma">,
+  /** Restrict to these subscriptions. Tests must pass it; cron passes nothing. */
+  scope?: { subscriptionIds?: string[] },
+): Promise<number> => {
+  const { prisma } = deps;
+
+  const stranded = await prisma.billingPeriodUsage.findMany({
+    where: {
+      ...(scope?.subscriptionIds ? { subscriptionId: { in: scope.subscriptionIds } } : {}),
+      status: "OPEN",
+      subscription: { status: { notIn: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
+    },
+    select: { subscriptionId: true },
+    distinct: ["subscriptionId"],
+  });
+
+  let count = 0;
+  for (const { subscriptionId } of stranded) {
+    const { closed } = await closeOpenPeriods({ prisma }, subscriptionId);
+    count += closed.length;
+    for (const id of closed) {
+      console.warn(`[usage] closed period ${id} stranded OPEN on retired sub ${subscriptionId}`);
+    }
+  }
+  return count;
+};
+
+/**
  * Recompute a period's usage from ClickHouse.
  *
  * One grouped query yields billable events per hour for the whole period so
@@ -106,7 +243,7 @@ export const aggregatePeriod = async (
 
   // Query to the end of the current hour, or to the period end, whichever is
   // sooner. A closed period is aggregated to its own end.
-  const queryEnd = new Date(Math.min(period.periodEnd.getTime(), startOfHour(now).getTime() + 3_600_000));
+  const queryEnd = new Date(Math.min(period.periodEnd.getTime(), startOfHour(now).getTime() + HOUR_MS));
 
   const rows: HourRow[] =
     websiteIds.length === 0 || queryEnd <= period.periodStart
@@ -160,9 +297,9 @@ const upsertBuckets = async (
   rows: HourRow[],
   now: Date,
 ) => {
-  // One statement for the whole period: INSERT ... ON CONFLICT (subscription,
-  // hour) DO UPDATE. Prisma has no upsertMany, and a round trip per hour would
-  // be 744 queries a month per subscription.
+  // One statement for the whole period: INSERT ... ON CONFLICT (period, hour)
+  // DO UPDATE. Prisma has no upsertMany, and a round trip per hour would be
+  // 744 queries a month per subscription.
   const values = Prisma.join(
     rows.map(
       (r) =>
@@ -173,9 +310,8 @@ const upsertBuckets = async (
   await tx.$executeRaw`
     INSERT INTO usage_buckets (id, subscription_id, billing_period_usage_id, bucket_start, quantity, source, computed_at)
     VALUES ${values}
-    ON CONFLICT (subscription_id, bucket_start) DO UPDATE SET
+    ON CONFLICT (billing_period_usage_id, bucket_start) DO UPDATE SET
       quantity = EXCLUDED.quantity,
-      billing_period_usage_id = EXCLUDED.billing_period_usage_id,
       computed_at = EXCLUDED.computed_at
   `;
 };

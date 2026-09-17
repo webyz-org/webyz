@@ -7,6 +7,7 @@ import { assignFreePlan } from "../free-plan.service.js";
 import { notifyOnce } from "../notifications/notification.service.js";
 import { reconcileRestriction } from "../state/restriction.service.js";
 import { reconcileSitesToLimit } from "../subscription/site-limit.service.js";
+import { closeOpenPeriods } from "../usage/aggregation.service.js";
 import {
   trialExpiredEmail,
   trialReminderEmail,
@@ -76,11 +77,18 @@ export const startTrial = async (ctx: Deps, userId: string, now = new Date()) =>
   }
 
   const endsAt = trialEndFor(now);
+  // Free or trial rows this replaces, settled after the transaction commits.
+  const retiredIds: string[] = [];
   const sub = await prisma.$transaction(async (tx) => {
     // Claim eligibility first: a concurrent signup path cannot start two.
     const claimed = await tx.user.updateMany({ where: { id: userId, trialUsedAt: null }, data: { trialUsedAt: now } });
     if (claimed.count === 0) return null;
 
+    const retiring = await tx.subscription.findMany({
+      where: { userId, status: { in: [...LIVE_STATUSES] }, providerSubscriptionId: null },
+      select: { id: true },
+    });
+    retiredIds.push(...retiring.map((r) => r.id));
     await tx.subscription.updateMany({
       where: { userId, status: { in: [...LIVE_STATUSES] }, providerSubscriptionId: null },
       data: { status: "CANCELED", canceledAt: now },
@@ -103,6 +111,11 @@ export const startTrial = async (ctx: Deps, userId: string, now = new Date()) =>
     });
   });
   if (!sub) return null;
+
+  // The replaced row is no longer synced, so its period must not stay OPEN.
+  // No ClickHouse client here on purpose: a provider-less row has no charge
+  // path, so its last synced total is the final one (usage/aggregation.ts).
+  for (const id of retiredIds) await closeOpenPeriods({ prisma }, id, now);
 
   // A fresh allowance: sites blocked under the free quota come back on.
   await reconcileRestriction(ctx, userId, now);
@@ -235,6 +248,9 @@ export const expireTrials = async (ctx: Deps, now = new Date(), scope?: JobScope
 
   let count = 0;
   for (const t of expired) {
+    // Settle the trial's period before the row leaves the live set, or the
+    // usage sync never looks at it again and it stays OPEN forever.
+    await closeOpenPeriods({ prisma }, t.id, now);
     await prisma.subscription.update({
       where: { id: t.id },
       data: { status: "CANCELED", canceledAt: now, restriction: "NONE", restrictedAt: null },

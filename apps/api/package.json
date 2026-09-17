@@ -21,7 +21,7 @@
     "lint": "tsc --noEmit",
     "prisma:seed": "tsx prisma/seed.ts",
     "migrate:deploy": "prisma migrate deploy && tsx scripts/clickhouse/migrate.ts && tsx prisma/seed.ts",
-    "test": "node --import tsx --test --test-concurrency=1 --test-timeout=120000 \"src/**/*.test.ts\""
+    "test": "RESEND_API_KEY= node --import tsx --test --test-concurrency=1 --test-timeout=120000 \"src/**/*.test.ts\""
   },
   "keywords": [],
   "author": "",

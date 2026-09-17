@@ -203,7 +203,7 @@ test("funnels: unauthenticated is 401, and an entitled user still cannot reach a
   // answer every other site-scoped route gives, before any plan is consulted.
   const other = await call("GET", `/api/v1/websites/${accounts.free.siteId}/funnels`, accounts.growth);
   assert.equal(other.status, 403, JSON.stringify(other.body));
-  assert.equal(other.body.error.code, "SITE_ACCESS_DENIED");
+  assert.equal(other.body.error?.code, "SITE_ACCESS_DENIED");
 });
 
 // ─── Journeys ────────────────────────────────────────────────────────────────

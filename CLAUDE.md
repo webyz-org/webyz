@@ -72,6 +72,23 @@ not claim a change there is tested. Pure logic is tested directly; database
 paths are tested against the Postgres in `DATABASE_URL` when `RUN_DB_TESTS=1`
 is set, and skipped otherwise.
 
+A `*.db.test.ts` must not import a module that opens a process-wide connection
+(`lib/redis.ts`, `lib/clickhouse.ts`, or anything importing them, such as
+`billing-cron.service.ts`). The handle keeps the event loop alive, so the test
+file never exits and `node --test` kills it after the timeout, reporting a
+failure while every subtest passed. Put the code under test in a module that
+takes its dependencies as arguments, which is the convention everywhere else in
+`core/`.
+
+Tests never send real email. `core/email/transports.ts` forces the console
+transport whenever `NODE_TEST_CONTEXT` is set (Node sets it in every process
+the test runner spawns), and the `test` script blanks `RESEND_API_KEY` as well.
+Without that guard a DB run sends dozens of messages through whatever key sits
+in the developer's `.env`, exhausts the provider's rate limit, and then fails
+unrelated tests: `notifyOnce` deletes its row and reports failure when delivery
+fails, so assertions about notifications break for a reason that has nothing to
+do with the code under test.
+
 ## State of the codebase
 
 Everything below builds and runs. `pnpm lint`, `pnpm typecheck` and `pnpm build`

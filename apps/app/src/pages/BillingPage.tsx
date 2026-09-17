@@ -205,7 +205,7 @@ function PlanCard({
     if (state === "FREE") return "Free forever, no card on file";
     if (cancelling) return `Ends ${longDate(sub!.cancelAt)}. Access continues until then.`;
     if (state === "GRACE") return `Payment failed. Please update your card before ${longDate(sub?.graceEndsAt ?? null)}.`;
-    if (state === "RESTRICTED") return restrictionLine(s.access.reason);
+    if (state === "RESTRICTED") return restrictionLine(s.access.reason, s.trial);
     return `Renews ${longDate(nextBilling)}`;
   })();
 
@@ -254,9 +254,15 @@ function PlanCard({
   );
 }
 
-const restrictionLine = (reason: string | null) => {
+const restrictionLine = (reason: string | null, trial: UsageSummary["trial"] = null) => {
   switch (reason) {
     case "FREE_QUOTA":
+      // A trial is a single period spanning the whole trial, so there is no
+      // reset to wait for: it stays paused until the trial ends, and the free
+      // plan that follows opens a fresh period with a much smaller allowance.
+      if (trial) {
+        return `Trial allowance used up. Choose a plan to resume tracking now, or wait for the trial to end and ${trial.fallbackPlanName}'s smaller allowance to start.`;
+      }
       return "Event allowance reached. Tracking resumes when the period resets or you upgrade.";
     case "SPEND_CAP":
       return "Your spending cap was reached. Raise it below to resume tracking now.";

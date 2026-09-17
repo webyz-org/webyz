@@ -68,7 +68,18 @@ const resendTransport: EmailTransport = {
   },
 };
 
+/**
+ * Node sets this in every process the test runner spawns. A test must never
+ * reach a real mail provider: the developer's `.env` usually holds a working
+ * key, and a full run sends dozens of messages, which burns the account's
+ * rate limit and then fails unrelated tests (`notifyOnce` deletes its row and
+ * reports failure when delivery fails). `pnpm test` also blanks the key, but
+ * this catches a single file run straight through `node --test`.
+ */
+const UNDER_TEST_RUNNER = Boolean(process.env.NODE_TEST_CONTEXT);
+
 export const selectTransport = (): EmailTransport => {
+  if (UNDER_TEST_RUNNER) return consoleTransport;
   if (RESEND_API_KEY) return resendTransport;
 
   if (SMTP_URL) {

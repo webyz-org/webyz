@@ -488,8 +488,12 @@ model UsageBucket {
   subscription Subscription       @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
   period       BillingPeriodUsage @relation(fields: [billingPeriodUsageId], references: [id], onDelete: Cascade)
 
-  @@unique([subscriptionId, bucketStart])
-  @@index([billingPeriodUsageId])
+  // Unique per period, not per subscription: a period that starts mid-hour
+  // shares that clock hour with the period before it, each owning the part of
+  // the hour inside its own window. Keying on the subscription would let the
+  // two periods overwrite one another's boundary bucket.
+  @@unique([billingPeriodUsageId, bucketStart])
+  @@index([subscriptionId])
   @@map("usage_buckets")
 }
 
