@@ -23,6 +23,8 @@ export type UsageSummary = {
     cancelAt: string | null;
     trialEndsAt: string | null;
     graceEndsAt: string | null;
+    /** True when a subscription exists at the provider to change or cancel. */
+    isProviderBacked: boolean;
   } | null;
   /**
    * What the base plan costs and when it renews. For annual customers this is
@@ -203,6 +205,11 @@ export const getUsageSummary = async (
           cancelAt: sub.cancelAt?.toISOString() ?? null,
           trialEndsAt: sub.trialEndsAt?.toISOString() ?? null,
           graceEndsAt: sub.graceEndsAt?.toISOString() ?? null,
+          // Whether there is a subscription at the provider to modify. A plan
+          // change, a cancellation and the invoice list all need one; a free
+          // row and a local trial have none, so those accounts start a plan
+          // through checkout instead. The id itself is never sent.
+          isProviderBacked: sub.providerSubscriptionId !== null,
         }
       : null,
     trial,

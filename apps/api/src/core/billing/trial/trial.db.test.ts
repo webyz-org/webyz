@@ -20,6 +20,7 @@ import { chooseActiveSites, reconcileSitesToLimit } from "../subscription/site-l
 import { checkIngestAllowed } from "../../tracker/tracking.service.js";
 import { closeRedis } from "../../../lib/redis.js";
 import { getUsageSummary } from "../usage/usage.service.js";
+import { reconcileRestriction } from "../state/restriction.service.js";
 import {
   backfillTrials,
   expireTrials,
@@ -105,6 +106,49 @@ test("new account starts a Growth trial with a single usage period covering the 
   assert.equal(summary.trial?.daysRemaining, BILLING_CONFIG.trial.days - 2);
   assert.equal(summary.trial?.fallbackPlanName, "Free");
   assert.equal(summary.usage.includedEvents, 500_000);
+  // No subscription at the provider, so the only way onto a paid plan is
+  // checkout. The billing page reads exactly this to decide.
+  assert.equal(summary.subscription?.isProviderBacked, false);
+});
+
+test("a trial that used up its allowance still reports itself as a trial to buy out of", { skip }, async () => {
+  // The dead end this pins: a restriction outranks everything in deriveAccess,
+  // so an exhausted trial's access.state reads RESTRICTED, not TRIAL. A page
+  // that infers "this account pays" from the state then offers a plan *change*,
+  // which needs a provider subscription a trial does not have, and the plan the
+  // trialist is on shows as "current" and unbuyable. The customer is stuck at
+  // the one moment they are trying to pay, so `trial` and `isProviderBacked`
+  // have to stay truthful while restricted.
+  const user = await newUser("exhausted");
+  const trial = (await startTrial(ctx, user.id, NOW))!;
+  // The hourly sync opens the period; stand in for it, already over the line.
+  await prisma.billingPeriodUsage.create({
+    data: {
+      subscriptionId: trial.id,
+      periodStart: trial.currentPeriodStart!,
+      periodEnd: trial.currentPeriodEnd!,
+      includedEvents: BigInt(500_000),
+      totalEvents: BigInt(500_344),
+      overageEvents: BigInt(344),
+      status: "OPEN",
+    },
+  });
+  await reconcileRestriction(ctx, user.id, new Date(NOW.getTime() + DAY));
+
+  const restricted = await prisma.subscription.findUniqueOrThrow({ where: { id: trial.id } });
+  assert.equal(restricted.restriction, "FREE_QUOTA");
+  assert.equal(restricted.status, "TRIALING");
+
+  const summary = await getUsageSummary(ctx, user.id, new Date(NOW.getTime() + DAY));
+  assert.equal(summary.access.state, "RESTRICTED");
+  assert.equal(summary.access.reason, "FREE_QUOTA");
+  assert.equal(summary.access.ingestAllowed, false);
+  // Both of these drive the page's only route out of the dead end.
+  assert.ok(summary.trial, "an exhausted trial is still a trial");
+  assert.equal(summary.subscription?.isProviderBacked, false);
+  // A trial bills nothing, so it is a hard limit, not pay-as-you-go.
+  assert.equal(summary.usage.isPayAsYouGo, false);
+  assert.equal(summary.spendCap.applies, false);
 });
 
 test("a second trial is never granted; a user who had one gets Free", { skip }, async () => {
@@ -137,6 +181,10 @@ test("trial to paid: checkout sync retires the trial and lands on the paid plan"
     const paid = await live(user.id);
     assert.equal(paid.providerSubscriptionId, providerSub.id);
     assert.equal(paid.status, "ACTIVE");
+    // Now there is something at the provider, so the page offers a plan change
+    // rather than checkout. The opposite of the exhausted-trial case above.
+    const summary = await getUsageSummary(ctx, user.id, NOW);
+    assert.equal(summary.subscription?.isProviderBacked, true);
     // An expired trial can never be charged: nothing local ever creates a provider subscription.
     assert.equal(fake.calls.filter((c) => c.method === "startCheckout").length, 0);
   } finally {

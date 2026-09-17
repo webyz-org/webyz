@@ -70,6 +70,8 @@ export type UsageSummary = {
     cancelAt: string | null;
     trialEndsAt: string | null;
     graceEndsAt: string | null;
+    /** True when a subscription exists at the provider to change or cancel. */
+    isProviderBacked: boolean;
   } | null;
   access: {
     state: "FREE" | "TRIAL" | "PAID" | "GRACE" | "RESTRICTED" | "ENDED";

@@ -66,7 +66,15 @@ export default function BillingPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
 
   const s = summary.data;
-  const isPaid = Boolean(s?.subscription && s.access.state !== "FREE" && s.access.state !== "TRIAL");
+  // "Can this subscription be changed at the provider?", not "is this account
+  // paying?". Only a provider-backed row can be changed or cancelled; a free
+  // row and a local trial have nothing there, so they buy a plan through
+  // checkout. Deriving this from access.state got a trial that had used up its
+  // allowance wrong: `restriction` outranks everything in deriveAccess, so its
+  // state reads RESTRICTED rather than TRIAL, which sent the customer to the
+  // plan-change dialog and a 400 from the API at exactly the moment they were
+  // trying to pay.
+  const canChangePlan = Boolean(s?.subscription?.isProviderBacked);
   // Nothing is purchasable until the payment provider and price ids exist;
   // the API says so per plan, and the page explains instead of failing.
   const nothingForSale = Boolean(plans.data?.length) && !plans.data!.some((p) => p.purchasable);
@@ -127,7 +135,7 @@ export default function BillingPage() {
 
           <section className="space-y-4">
             <div className="flex flex-wrap items-baseline justify-between gap-3">
-              <h2 className="font-medium">{isPaid ? "Change plan" : "Choose a plan"}</h2>
+              <h2 className="font-medium">{canChangePlan ? "Change plan" : "Choose a plan"}</h2>
               <div className="flex items-center gap-2">
                 {(["MONTHLY", "YEARLY"] as const).map((option) => (
                   <button
@@ -150,10 +158,12 @@ export default function BillingPage() {
               cycle={cycle}
               currentPlanId={s.plan.id}
               currentCycle={s.subscription?.billingCycle ?? "MONTHLY"}
-              isPaid={isPaid}
-              isTrial={s?.access.state === "TRIAL"}
+              isPaid={canChangePlan}
+              isTrial={Boolean(s?.trial)}
               onChoose={(plan) =>
-                isPaid ? setChangeTarget({ plan, billingCycle: cycle }) : checkout.mutate({ planId: plan.id, billingCycle: cycle })
+                canChangePlan
+                  ? setChangeTarget({ plan, billingCycle: cycle })
+                  : checkout.mutate({ planId: plan.id, billingCycle: cycle })
               }
               busy={checkout.isPending}
             />
@@ -166,7 +176,7 @@ export default function BillingPage() {
             {checkout.error && <p className="text-sm text-danger">{(checkout.error as { message?: string }).message}</p>}
           </section>
 
-          {isPaid && <InvoicesCard />}
+          {canChangePlan && <InvoicesCard />}
 
           <PlanChangeDialog target={changeTarget} onClose={() => setChangeTarget(null)} />
           <CancelDialog open={cancelOpen} onClose={() => setCancelOpen(false)} />
@@ -199,6 +209,11 @@ function PlanCard({
   const state = s.access.state;
   const nextBilling = s.base.cycle === "YEARLY" ? s.base.periodEnd : s.period.end;
   const cancelling = Boolean(sub?.cancelAt);
+  // The payment and cancel actions all reach the provider, so they belong to
+  // accounts that have something there. Gating them on `state !== "TRIAL"`
+  // showed them to a trial whose allowance had run out, because a restriction
+  // makes the state read RESTRICTED: three buttons that could only fail.
+  const providerBacked = Boolean(sub?.isProviderBacked);
 
   const statusLine = (() => {
     if (state === "TRIAL") return `Trial, ends ${longDate(s.trial?.endsAt ?? null)}`;
@@ -216,7 +231,7 @@ function PlanCard({
           <div>
             <h2 className="font-medium">
               {s.plan.name} plan
-              {sub && !s.plan.isFree && state !== "TRIAL" && (
+              {providerBacked && !s.plan.isFree && (
                 <span className="ml-2 text-sm font-normal text-text-secondary">
                   {formatMoney(s.base.priceCents)} {s.base.cycle === "YEARLY" ? "a year" : "a month"}
                   {s.base.cycle === "YEARLY" && ` (${formatMoney(s.base.monthlyEquivalentCents)} a month)`}
@@ -232,7 +247,7 @@ function PlanCard({
           )}
         </div>
 
-        {sub && !s.plan.isFree && state !== "TRIAL" && (
+        {providerBacked && !s.plan.isFree && (
           <div className="flex flex-wrap gap-2 pt-1">
             <Button variant="outline" onClick={onManagePayment} disabled={managePending}>
               {managePending ? "Opening..." : "Payment method and receipts"}
