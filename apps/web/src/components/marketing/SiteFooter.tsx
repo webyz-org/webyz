@@ -26,6 +26,7 @@ const COLUMNS: { title: string; links: FootLink[] }[] = [
       { label: "Goals", href: "/#privacy" },
       { label: "Pricing", href: "/pricing" },
       { label: "Documentation", href: "/docs" },
+      { label: "Changelog", href: "/changelog" },
     ],
   },
   {

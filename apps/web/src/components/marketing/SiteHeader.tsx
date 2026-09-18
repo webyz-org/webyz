@@ -17,6 +17,7 @@ export const PRODUCT_AREAS = [
 const NAV = [
   { href: "/pricing", label: "Pricing" },
   { href: "/docs", label: "Docs" },
+  { href: "/changelog", label: "Changelog" },
 ];
 
 const linkCls = "flex h-9 items-center gap-1 rounded-lg px-3 text-[13.5px] font-medium text-text-secondary transition-colors hover:text-ink";

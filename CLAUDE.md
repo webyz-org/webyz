@@ -398,9 +398,18 @@ placeholder text there flashes before React mounts.
 
 ## Frontend (apps/web)
 
-Next.js 16 App Router marketing site: landing (`/`) and pricing (`/pricing`)
-only. Auth and the dashboard live in `apps/app`, and the CTAs link there via
-`NEXT_PUBLIC_APP_URL`.
+Next.js 16 App Router marketing site: landing (`/`), pricing (`/pricing`),
+the rendered documentation (`/docs`, `/docs/<slug>`), the changelog
+(`/changelog`) and the legal pages. Auth and the dashboard live in `apps/app`,
+and the CTAs link there via `NEXT_PUBLIC_APP_URL`.
+
+The changelog is the reader's release notes, not the operator's: `src/lib/changelog.ts`
+holds dated entries written in product language, each item tagged new, improved
+or fixed, rendered as a timeline at `/changelog` and as RSS at
+`/changelog/rss.xml` (both prerendered, nothing fetched). The repository's
+`CHANGELOG.md` stays the exhaustive Keep a Changelog file an operator scans
+before upgrading; a release adds a section there and an entry here, and an
+entry's `slug` is a published permalink that must not change.
 
 The pricing page fetches the public `/api/v1/plans` list server side with a
 5 minute revalidate, so marketing pricing and in-app billing cannot drift. If

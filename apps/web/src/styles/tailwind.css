@@ -14,6 +14,10 @@
   --color-brand-ink: #3b63f0;
   --color-primary-soft: #e9eefe;
   --color-success: #00c275;
+  /* The success pair for text on a tint: #0a7a54 on #e3f7ef is 4.8:1, AA.
+     --color-success itself is a 2.2:1 fill colour and unreadable as text. */
+  --color-success-soft: #e3f7ef;
+  --color-success-ink: #0a7a54;
   --color-danger: #fc4945;
 
   --color-surface: #ffffff;

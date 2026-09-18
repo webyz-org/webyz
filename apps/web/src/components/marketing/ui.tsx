@@ -15,6 +15,8 @@ const ICONS = {
   plus: "M12 5v14M5 12h14",
   x: "M6 6l12 12M18 6 6 18",
   spark: "M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2M6 18l2-2M16 8l2-2",
+  rss: "M5 18.5a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1M5 12a7 7 0 0 1 7 7M5 5a14 14 0 0 1 14 14",
+  link: "M10.5 13.5a4 4 0 0 0 5.66 0l2.5-2.5a4 4 0 1 0-5.66-5.66l-1 1M13.5 10.5a4 4 0 0 0-5.66 0l-2.5 2.5a4 4 0 1 0 5.66 5.66l1-1",
 } as const;
 
 export function Ico({ name, className = "h-4 w-4" }: { name: keyof typeof ICONS; className?: string }) {

@@ -26,6 +26,7 @@ All notable changes to Webyz are recorded here. The format follows [Keep a Chang
 - Health endpoints `/health` and `/health/ready`, security headers on every API response.
 - One-command self-hosting: `infra/setup.sh` plus `docker compose up -d` with bundled Caddy and automatic TLS, prebuilt images on GitHub Container Registry, and a documented path for an existing reverse proxy.
 - Public documentation under `docs/`, rendered on the hosted site at `/docs`.
+- A changelog page on the marketing site at `/changelog`, with an RSS feed at `/changelog/rss.xml`. It is the reader's view of releases (dated entries in product language, each line tagged new, improved or fixed, written in `apps/web/src/lib/changelog.ts`); this file stays the operator's exhaustive record, and a release updates both.
 - Email verification for password signups (`EMAIL_VERIFICATION`, on by default whenever a mail provider is configured): the account sits on Free and cannot sign in until the emailed link is opened, and the 30-day Growth trial starts at that moment, so a throwaway address gets nothing. Google signups are verified on creation. Existing accounts are treated as verified.
 - `REGISTRATION` setting: the self-host stack allows only the first account and closes signups after it; `open` restores public registration.
 - ClickHouse small-server profile, log rotation on every container, an unprivileged dashboard image, issue and pull request templates, Dependabot, and this changelog.

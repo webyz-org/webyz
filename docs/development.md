@@ -98,6 +98,9 @@ examples      Static pages that load the tracker for manual testing
 2. Tag and push: `git tag v1.2.3 && git push origin v1.2.3`.
 3. CI builds the API and dashboard images for amd64 and arm64 and pushes them to GitHub Container Registry as `1.2.3`, `1.2` and `latest`. The first time, make the two packages public in the GitHub package settings so self-hosters can pull them without a token.
 4. Create the GitHub release from the tag and paste the changelog section.
+5. Add the reader's entry to `apps/web/src/lib/changelog.ts`, at the top of `RELEASES`. That file is what the
+   hosted site publishes at `/changelog` and in its RSS feed: the same release told in product language rather
+   than the operator's full list. Its `slug` is a permalink, so pick it once and leave it alone.
 
 ## Making a change
 
