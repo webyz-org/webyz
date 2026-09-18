@@ -47,6 +47,23 @@ export const sortItems = (items: readonly ChangeItem[]): ChangeItem[] =>
 
 export const RELEASES: Release[] = [
   {
+    slug: "blog-and-changelog",
+    date: "2026-09-18",
+    title: "A blog, and this page",
+    summary:
+      "Two pages on the marketing site: the release notes you are reading, and somewhere to write properly about how the numbers are made.",
+    items: [
+      {
+        kind: "new",
+        text: "This changelog, at /changelog, with an RSS feed. Releases land here first, told in plain language; the repository's CHANGELOG.md stays the exhaustive version an operator reads before upgrading a self-hosted install.",
+      },
+      {
+        kind: "new",
+        text: "A blog at /blog, also with a feed. Three pieces to open it: a comparison of seven Google Analytics alternatives with prices read from each vendor's own page, what the metrics that matter actually are, and how to measure traffic without identifying anyone.",
+      },
+    ],
+  },
+  {
     slug: "billing-counts-every-hour",
     date: "2026-09-17",
     title: "Billing counts every hour, and a trial can buy a plan",
