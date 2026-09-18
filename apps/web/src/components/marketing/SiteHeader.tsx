@@ -17,6 +17,7 @@ export const PRODUCT_AREAS = [
 const NAV = [
   { href: "/pricing", label: "Pricing" },
   { href: "/docs", label: "Docs" },
+  { href: "/blog", label: "Blog" },
   { href: "/changelog", label: "Changelog" },
 ];
 

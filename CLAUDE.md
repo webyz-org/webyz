@@ -399,8 +399,8 @@ placeholder text there flashes before React mounts.
 ## Frontend (apps/web)
 
 Next.js 16 App Router marketing site: landing (`/`), pricing (`/pricing`),
-the rendered documentation (`/docs`, `/docs/<slug>`), the changelog
-(`/changelog`) and the legal pages. Auth and the dashboard live in `apps/app`,
+the rendered documentation (`/docs`, `/docs/<slug>`), the blog (`/blog`,
+`/blog/<slug>`), the changelog (`/changelog`) and the legal pages. Auth and the dashboard live in `apps/app`,
 and the CTAs link there via `NEXT_PUBLIC_APP_URL`.
 
 The changelog is the reader's release notes, not the operator's: `src/lib/changelog.ts`
@@ -410,6 +410,38 @@ or fixed, rendered as a timeline at `/changelog` and as RSS at
 `CHANGELOG.md` stays the exhaustive Keep a Changelog file an operator scans
 before upgrading; a release adds a section there and an entry here, and an
 entry's `slug` is a published permalink that must not change.
+
+The blog is Markdown in `apps/web/content/blog`, one file per post, the file
+name being the slug; there is no admin panel, so a post is a pull request.
+`lib/frontmatter.ts` is a deliberately tiny strict parser (a `---` block of
+`key: value` scalars and `[bracketed, lists]`, nothing nested) written instead
+of adding a YAML dependency, and `lib/blog.ts` turns a file into a post,
+validating as it goes: the slug shape, a real `YYYY-MM-DD` date, a description
+under 200 characters, a cover that carries its alt text. Anything it cannot
+accept throws with the file named, which fails `next build` rather than
+shipping a broken page (verified 18 Sep 2026 with a bad date). A file starting
+with `_` is a draft and is not published. The leading `# Title` is stripped
+from the body because the page renders the frontmatter title as the only H1.
+
+Every blog page is prerendered, so the Markdown is read at build time only: the
+standalone Docker image carries the built HTML, not `content/`. Anything that
+starts reading a post at request time has to change `apps/web/Dockerfile`
+first, and the repo-root `.dockerignore` excludes `*.md` with one negation per
+content folder, so a new content directory needs its own line there or the
+image builds without it.
+
+`TableOfContents` is the one piece of client JavaScript a post loads: the
+section list beside it marks where you are by reading heading positions on
+scroll, directly rather than through an IntersectionObserver (the observer
+answers "is this heading on screen", which marks nothing while a section is
+taller than the viewport and two things at once when it is short).
+
+SEO is the point of the blog, so each post carries a canonical URL, article
+Open Graph and Twitter tags, `BlogPosting` and `BreadcrumbList` JSON-LD, and a
+social card generated at build from the title by
+`blog/[slug]/opengraph-image.tsx` (no design tool, never stale). The index
+carries `Blog` JSON-LD, the sitemap lists every post with its own date, and
+`/blog/rss.xml` is the feed.
 
 The pricing page fetches the public `/api/v1/plans` list server side with a
 5 minute revalidate, so marketing pricing and in-app billing cannot drift. If

@@ -18,10 +18,15 @@ function Hand({ children, className = "" }: { children: React.ReactNode; classNa
   );
 }
 
-// Verified against apps/api/public/js/script.js: 3,843 bytes gzipped, no
-// cookies or browser storage, 30 minute server-side session window.
+// Measured against apps/api/public/js/script.js on 18 Sep 2026: 6,484 bytes
+// gzipped (5,533 brotli), no cookies or browser storage, 30 minute server-side
+// session window. It said 3,843 bytes and "under 4 KB" from an earlier
+// measurement; engagement reporting, outbound links, file downloads and 404
+// tracking were added to the script after that and nobody re-measured. Re-run
+// `gzip -c apps/api/public/js/script.js | wc -c` when you touch the tracker,
+// and change this line with it.
 const FIGURES: [string, string, string][] = [
-  ["Under", "4 KB", "script"],
+  ["About", "6 KB", "script"],
   ["Sets", "0", "cookies"],
   ["Session", "30", "min"],
 ];
@@ -35,7 +40,7 @@ const VIEWS = [
 
 const AUDIENCES = [
   { title: "Founders", text: "One page that answers whether the launch worked: visitors, where they came from, what they read and whether they signed up. Six stats above the fold, no configuration, no training." },
-  { title: "Developers", text: "One script tag, 4.4 KB gzipped. Postgres, ClickHouse and Redis under the hood, self-hostable, and a plain data model you can query yourself." },
+  { title: "Developers", text: "One script tag, 6.3 KB gzipped. Postgres, ClickHouse and Redis under the hood, self-hostable, and a plain data model you can query yourself." },
   { title: "Marketers", text: "Channels, sources and UTM breakdowns, filters that live in the URL so a view is a link, and goals that count the page visits and events that matter." },
   { title: "Teams", text: "Realtime on a shared screen, journeys to settle arguments about where people actually go, and public share links for anyone who needs a look without an account." },
 ];

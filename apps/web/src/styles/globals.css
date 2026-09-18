@@ -47,6 +47,15 @@ body {
   mask-image: linear-gradient(to bottom, black 55%, transparent 100%);
 }
 
+/* Jumping to a heading from a section list reads better as a short glide than
+   as a teleport, and it shows which way the page moved. Off for anyone who has
+   asked for less motion. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 details > summary {
   list-style: none;
   cursor: pointer;

@@ -149,7 +149,7 @@ export const RELEASES: Release[] = [
       },
       {
         kind: "new",
-        text: "A tracker under 4 KB gzipped that sets no cookie and writes nothing to the browser. Visitors are identified by a server-side hash that rotates daily, and the IP address is used for the country lookup and then dropped.",
+        text: "A small tracker that sets no cookie and writes nothing to the browser. Visitors are identified by a server-side hash that rotates daily, and the IP address is used for the country lookup and then dropped.",
       },
       {
         kind: "new",

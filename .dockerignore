@@ -20,3 +20,4 @@ infra
 *.md
 !apps/api/docs/*.md
 !docs/*.md
+!apps/web/content/blog/*.md
