@@ -27,7 +27,7 @@ WORKDIR /repo/apps/app
 RUN pnpm build
 
 # Unprivileged nginx: runs as uid 101, listens on 8080, writes only to /tmp.
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
 COPY apps/app/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build --chown=nginx:nginx /repo/apps/app/dist /usr/share/nginx/html
 EXPOSE 8080
