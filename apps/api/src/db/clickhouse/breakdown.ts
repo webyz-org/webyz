@@ -235,9 +235,12 @@ export const sessionBreakdown = async (
         argMax(duration_seconds, updated_at) AS duration_seconds,
         ${dedupColumns}
       FROM sessions
+      -- A session belongs to the window it started in, like top-stats and the
+      -- graph; an overlap test would also count a session that started before
+      -- midnight and was still engaged after it.
       WHERE website_id = {websiteId:String}
-        AND start_time < fromUnixTimestamp({to:UInt32})
-        AND end_time >= fromUnixTimestamp({from:UInt32})${pagePathClause}
+        AND start_time >= fromUnixTimestamp({from:UInt32})
+        AND start_time <  fromUnixTimestamp({to:UInt32})${pagePathClause}
       GROUP BY session_id
     ),
     filtered AS (

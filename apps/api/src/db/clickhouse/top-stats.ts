@@ -49,7 +49,7 @@ export const topStatsQuery = async (
           FROM webyz_analytics.sessions
           WHERE website_id = {websiteId:String}
             AND start_time >= ${fromExpr}
-            AND start_time <= ${toExpr}${restriction}
+            AND start_time <  ${toExpr}${restriction}
           GROUP BY session_id
         )
         ${filterWhere}`;
