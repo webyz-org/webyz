@@ -9,7 +9,12 @@ import {
   type FilteredTrafficResponse,
   type JourneyMetric,
   type JourneysResponse,
+  type LinkEventKind,
   type MainGraphResponse,
+  type OutboundGroup,
+  type OutboundRow,
+  type OutboundSummary,
+  type OutboundTimeseries,
   type RealtimeResponse,
   type TopStatsResponse,
 } from "./types";
@@ -86,6 +91,22 @@ export const EXPORT_GROUPS: { label: string; items: { key: string; label: string
       { key: "cities", label: "Cities" },
     ],
   },
+  {
+    label: "Outbound links",
+    items: [
+      { key: "outbound-domains", label: "Destination domains" },
+      { key: "outbound-links", label: "Destination links" },
+      { key: "outbound-pages", label: "Pages clicked from" },
+    ],
+  },
+  {
+    label: "Downloads",
+    items: [
+      { key: "download-files", label: "Files" },
+      { key: "download-types", label: "File types" },
+      { key: "download-pages", label: "Pages downloaded from" },
+    ],
+  },
 ];
 
 /**
@@ -136,6 +157,29 @@ export const getBreakdown = (
     ...scopeParams(scope),
     detailed: options.detailed ? "true" : "false",
     ...(options.limit ? { limit: options.limit } : {}),
+  });
+
+/** Outbound link clicks grouped by destination domain, destination URL or source page. */
+export const getOutboundLinks = (
+  scope: AnalyticsScope,
+  by: OutboundGroup,
+  options: { limit?: number; kind?: LinkEventKind } = {},
+): Promise<Paged<OutboundRow[]>> =>
+  getPaged<OutboundRow[]>(`/${scope.siteId}/outbound-links`, {
+    ...scopeParams(scope),
+    kind: options.kind ?? "outbound",
+    by,
+    ...(options.limit ? { limit: options.limit } : {}),
+  });
+
+export const getOutboundSummary = (scope: AnalyticsScope, kind: LinkEventKind = "outbound") =>
+  get<OutboundSummary>(`/${scope.siteId}/outbound-links/summary`, { ...scopeParams(scope), kind });
+
+export const getOutboundTimeseries = (scope: AnalyticsScope, interval: string, kind: LinkEventKind = "outbound") =>
+  get<OutboundTimeseries>(`/${scope.siteId}/outbound-links/timeseries`, {
+    ...scopeParams(scope),
+    kind,
+    interval,
   });
 
 export const getJourneys = (

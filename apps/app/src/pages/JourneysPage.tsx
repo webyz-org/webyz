@@ -9,6 +9,7 @@ import RetentionNotice from "../features/billing/components/RetentionNotice";
 import { useSiteByDomain } from "../features/websites/hooks/useWebsite";
 import { usePeriod } from "../shared/hooks/usePeriod";
 import type { JourneyMetric } from "../features/dashboard/types";
+import PageHeader from "../shared/components/PageHeader";
 
 const DEPTHS = [1, 2, 3, 4, 5];
 const DEFAULT_DEPTH = 5;
@@ -67,61 +68,56 @@ export default function JourneysPage() {
 
   return (
     <div className="mx-auto max-w-[1280px] px-4 md:px-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 py-4">
-        <div>
-          <h1 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
-            {site.name} · Journeys
-          </h1>
-          <p className="mt-0.5 text-xs text-text-muted">
-            Where visitors go after each page. Click any page to follow that
-            branch.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {startingPath && (
-            <button
-              type="button"
-              onClick={() => setParam("path", null)}
-              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"
-            >
-              <RotateCcw size={14} />
-              Reset
-            </button>
-          )}
-
-          <div className="flex overflow-hidden rounded-md border border-border" role="group" aria-label="Journey depth">
-            {DEPTHS.map((d) => (
+      <PageHeader
+        siteName={site.name}
+        title="Journeys"
+        description="Where visitors go after each page. Click any page to follow that branch."
+        actions={
+          <>
+            {startingPath && (
               <button
-                key={d}
                 type="button"
-                onClick={() => setParam("depth", String(d))}
-                className={
-                  "px-2.5 py-2 text-sm " +
-                  (d === depth
-                    ? "bg-indigo-600 font-medium text-white"
-                    : "hover:bg-black/[0.03] dark:hover:bg-white/[0.05]")
-                }
-                aria-pressed={d === depth}
+                onClick={() => setParam("path", null)}
+                className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"
               >
-                {d}
+                <RotateCcw size={14} />
+                Reset
               </button>
-            ))}
-          </div>
+            )}
 
-          <select
-            value={metric}
-            onChange={(e) => setParam("metric", e.target.value)}
-            className="h-9 rounded-md border border-border bg-surface px-2 text-sm outline-none"
-            aria-label="Journey metric"
-          >
-            <option value="users">Users</option>
-            <option value="sessions">Sessions</option>
-          </select>
+            <div className="flex overflow-hidden rounded-md border border-border" role="group" aria-label="Journey depth">
+              {DEPTHS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setParam("depth", String(d))}
+                  className={
+                    "px-2.5 py-2 text-sm " +
+                    (d === depth
+                      ? "bg-indigo-600 font-medium text-white"
+                      : "hover:bg-black/[0.03] dark:hover:bg-white/[0.05]")
+                  }
+                  aria-pressed={d === depth}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
 
-          <PeriodPicker value={period} from={from} to={to} onChange={setPeriod} />
-        </div>
-      </div>
+            <select
+              value={metric}
+              onChange={(e) => setParam("metric", e.target.value)}
+              className="h-9 rounded-md border border-border bg-surface px-2 text-sm outline-none"
+              aria-label="Journey metric"
+            >
+              <option value="users">Users</option>
+              <option value="sessions">Sessions</option>
+            </select>
+
+            <PeriodPicker value={period} from={from} to={to} onChange={setPeriod} />
+          </>
+        }
+      />
 
       <FeatureGate
         feature="journeys"

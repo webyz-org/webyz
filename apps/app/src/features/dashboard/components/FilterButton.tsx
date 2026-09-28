@@ -117,7 +117,13 @@ export default function FilterButton() {
                     ? "/pricing"
                     : key === "goal"
                       ? "Goal name"
-                      : "Exact value"
+                      : key === "outbound_domain"
+                        ? "github.com"
+                        : key === "outbound_url"
+                          ? "https://github.com/webyz-org/webyz"
+                          : key === "download"
+                            ? "https://example.com/files/guide.pdf"
+                            : "Exact value"
               }
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={(e) => {

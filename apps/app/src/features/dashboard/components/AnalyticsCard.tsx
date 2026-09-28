@@ -24,12 +24,15 @@ export default function AnalyticsCard<T extends { name?: string; percentage?: nu
   onTabChange,
   open,
   onModalChange,
+  action,
 }: {
   tabs: TabConfig<T>[];
   activeTab: string;
   onTabChange: (key: string) => void;
   open: boolean;
   onModalChange: (open: boolean) => void;
+  /** Rendered beside the expand control: a link to the card's full page. */
+  action?: React.ReactNode;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
@@ -164,6 +167,7 @@ export default function AnalyticsCard<T extends { name?: string; percentage?: nu
           )}
         </div>
 
+        {action}
         <Dialog open={open} onOpenChange={onModalChange}>
           <DialogTrigger asChild>
             <button

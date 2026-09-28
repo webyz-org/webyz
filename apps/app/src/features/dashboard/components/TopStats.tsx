@@ -135,8 +135,8 @@ export default function TopStats({
                   (isFlat
                     ? "text-text-muted"
                     : good
-                      ? "text-[#0a7a4d] dark:text-emerald-400"
-                      : "text-[#b3261e] dark:text-red-400")
+                      ? "text-trend-up"
+                      : "text-trend-down")
                 }
               >
                 {isFlat ? (

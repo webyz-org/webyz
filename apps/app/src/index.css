@@ -49,6 +49,10 @@
   --color-brand: var(--brand);
   --color-brand-ink: var(--brand-ink);
   --color-primary-soft: var(--primary-soft);
+  /* Period-over-period change: good (green) and bad (red). One pair for every
+     comparison badge so Overview, Pages, Outbound and Search agree. */
+  --color-trend-up: var(--trend-up);
+  --color-trend-down: var(--trend-down);
   --color-bg: var(--app-bg);
   --color-surface: var(--app-surface);
   --color-surface-2: var(--app-surface-2);
@@ -102,6 +106,8 @@
 
   --brand: #4f75fe;
   --brand-ink: #3b63f0;
+  --trend-up: #0a7a4d;
+  --trend-down: #b3261e;
   --primary-soft: #e9eefe;
   --app-bg: #faf8f6;
   --app-surface: #ffffff;
@@ -152,6 +158,8 @@
      stays the same in both themes. */
   --brand: #7b95ff;
   --brand-ink: #9db0ff;
+  --trend-up: oklch(76.5% 0.177 163.223); /* emerald-400 */
+  --trend-down: oklch(70.4% 0.191 22.216); /* red-400 */
   --primary-soft: rgba(123, 149, 255, 0.16);
   --app-bg: #0a0a0b;
   --app-surface: #18181a;

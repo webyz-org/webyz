@@ -14,6 +14,7 @@ import {
 } from "../features/realtime/types";
 import { useSiteByDomain } from "../features/websites/hooks/useWebsite";
 import { formatCount } from "../shared/lib/format";
+import PageHeader from "../shared/components/PageHeader";
 
 // The map chunk carries d3-geo plus the world atlas; nobody pays for it until
 // they open this page.
@@ -96,85 +97,85 @@ export default function RealtimePage() {
 
   return (
     <div className="mx-auto max-w-[1280px] px-4 md:px-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 py-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
-              {site.name} · Realtime
-            </h1>
-            <span className="flex items-center gap-1.5 text-xs text-text-secondary">
-              <span className={`relative flex h-2 w-2`} aria-hidden>
-                {!feed.paused && feed.status === "live" && (
-                  <span
-                    className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${connection.dot}`}
-                  />
-                )}
-                <span
-                  className={`relative inline-flex h-2 w-2 rounded-full ${connection.dot}`}
-                />
-              </span>
-              {connection.label}
-            </span>
-          </div>
-          <p className="mt-0.5 text-xs text-text-muted">
+      <PageHeader
+        siteName={site.name}
+        title="Realtime"
+        description={
+          <>
             <span className="font-medium text-text-secondary">
               {feed.activeCount} active visitor{feed.activeCount === 1 ? "" : "s"}
             </span>
             {feed.lastUpdatedAt
               ? ` · updated ${timeAgo(feed.now, feed.lastUpdatedAt)}`
               : ""}
-          </p>
-        </div>
+          </>
+        }
+        titleAside={
+          <span className="flex items-center gap-1.5 text-xs text-text-secondary">
+            <span className={`relative flex h-2 w-2`} aria-hidden>
+              {!feed.paused && feed.status === "live" && (
+                <span
+                  className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-60 ${connection.dot}`}
+                />
+              )}
+              <span
+                className={`relative inline-flex h-2 w-2 rounded-full ${connection.dot}`}
+              />
+            </span>
+            {connection.label}
+          </span>
+        }
+        actions={
+          <>
+            <div
+              className="flex overflow-hidden rounded-md border border-border"
+              role="group"
+              aria-label="Map style"
+            >
+              {(["globe", "flat"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  aria-pressed={mode === m}
+                  className={
+                    "px-3 py-2 text-sm capitalize " +
+                    (mode === m
+                      ? "bg-primary font-medium text-primary-foreground"
+                      : "hover:bg-black/[0.03] dark:hover:bg-white/[0.05]")
+                  }
+                >
+                  {m === "flat" ? "Map" : "Globe"}
+                </button>
+              ))}
+            </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <div
-            className="flex overflow-hidden rounded-md border border-border"
-            role="group"
-            aria-label="Map style"
-          >
-            {(["globe", "flat"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                aria-pressed={mode === m}
-                className={
-                  "px-3 py-2 text-sm capitalize " +
-                  (mode === m
-                    ? "bg-primary font-medium text-primary-foreground"
-                    : "hover:bg-black/[0.03] dark:hover:bg-white/[0.05]")
-                }
-              >
-                {m === "flat" ? "Map" : "Globe"}
-              </button>
-            ))}
-          </div>
+            <select
+              value={windowMinutes}
+              onChange={(e) =>
+                setWindowMinutes(Number(e.target.value) as RealtimeWindow)
+              }
+              className="h-9 rounded-md border border-border bg-surface px-2 text-sm outline-none"
+              aria-label="Realtime window"
+            >
+              {REALTIME_WINDOWS.map((w) => (
+                <option key={w} value={w}>
+                  Last {w} min
+                </option>
+              ))}
+            </select>
 
-          <select
-            value={windowMinutes}
-            onChange={(e) =>
-              setWindowMinutes(Number(e.target.value) as RealtimeWindow)
-            }
-            className="h-9 rounded-md border border-border bg-surface px-2 text-sm outline-none"
-            aria-label="Realtime window"
-          >
-            {REALTIME_WINDOWS.map((w) => (
-              <option key={w} value={w}>
-                Last {w} min
-              </option>
-            ))}
-          </select>
-
-          <button
-            type="button"
-            onClick={feed.paused ? feed.resume : feed.pause}
-            className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"
-          >
-            {feed.paused ? <Play size={14} /> : <Pause size={14} />}
-            {feed.paused ? "Resume" : "Pause"}
-          </button>
-        </div>
-      </div>
+            <button
+              type="button"
+              onClick={feed.paused ? feed.resume : feed.pause}
+              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm hover:bg-black/[0.03] dark:hover:bg-white/[0.05]"
+            >
+              {feed.paused ? <Play size={14} /> : <Pause size={14} />}
+              {feed.paused ? "Resume" : "Pause"}
+            </button>
+          </>
+        }
+      />
 
       <div className="flex flex-col gap-4 lg:h-[calc(100vh-220px)] lg:min-h-[480px] lg:flex-row">
         {/* ── Map ────────────────────────────────────────────────────────── */}

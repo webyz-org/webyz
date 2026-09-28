@@ -9,6 +9,7 @@ import TechnologyCard from "../features/dashboard/components/TechnologyCard";
 import AcquisitionCard from "../features/dashboard/components/AcquisitionCard";
 import GeographyCard from "../features/dashboard/components/GeographyCard";
 import ConversionCard from "../features/dashboard/components/ConversionCard";
+import OutboundLinksCard from "../features/dashboard/components/OutboundLinksCard";
 import PeriodPicker from "../features/dashboard/components/PeriodPicker";
 import RealtimeBadge from "../features/dashboard/components/RealtimeBadge";
 import FilterBar from "../features/dashboard/components/FilterBar";
@@ -221,10 +222,15 @@ export default function DashboardPage() {
         <AcquisitionCard scope={scope} />
       </div>
 
-      <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
         <TechnologyCard scope={scope} />
         <GeographyCard scope={scope} />
         <ConversionCard scope={scope} siteDomain={site.domain} />
+        <OutboundLinksCard
+          scope={scope}
+          siteDomain={site.domain}
+          detailsHref={`${base}/outbound?${periodQuery(period, from, to)}`}
+        />
       </div>
     </div>
   );

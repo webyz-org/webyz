@@ -13,6 +13,16 @@ import {
   getCustomEvents,
 } from "../core/analytics/goals.service.js";
 import { getJourneys } from "../core/analytics/journeys.service.js";
+import { getOutboundLinks, getOutboundSummary, getOutboundTimeseries } from "../core/analytics/outbound.service.js";
+import { OUTBOUND_GROUPS, isOutboundGroup } from "../db/clickhouse/outbound.js";
+import { isLinkEventKind, type LinkEventKind } from "../db/clickhouse/filters.js";
+
+/** `kind=outbound` (default) or `kind=download`: which link event a report reads. */
+const resolveLinkKind = (query: { kind?: string }): LinkEventKind => {
+  const kind = query.kind ?? "outbound";
+  if (!isLinkEventKind(kind)) throw badRequest("kind must be outbound or download", { kind });
+  return kind;
+};
 import { getPageDetail, getPages } from "../core/analytics/pages.service.js";
 import { EXPORT_DATASETS, getExportTable, isExportDataset } from "../core/analytics/export.service.js";
 import { safeFilenamePart, toCsv } from "../http/helper/csv.js";
@@ -498,6 +508,84 @@ export const getCustomEventPropertiesController = async (
   });
 
   return sendResponse(reply, data.results, { meta: { ...data.meta, ...retentionMeta(range) } });
+};
+
+/**
+ * Outbound link clicks grouped by destination host (`by=domain`, the
+ * default), full destination URL (`by=url`) or the page clicked from
+ * (`by=page`). Same period, filters and retention cut as every breakdown.
+ */
+export const getOutboundLinksController = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+) => {
+  const query = request.query as AnalyticsQuery & { by?: string; kind?: string };
+  const { limit, page } = normalizePagination(query);
+  const range = await resolveWindow(request);
+
+  const by = query.by ?? "domain";
+  if (!isOutboundGroup(by)) {
+    throw badRequest(`by must be one of ${OUTBOUND_GROUPS.join(", ")}`, { by });
+  }
+
+  const data = await getOutboundLinks(request.ctx, {
+    websiteId: request.website.id,
+    from: range.from,
+    to: range.to,
+    kind: resolveLinkKind(query),
+    by,
+    limit,
+    page,
+    filters: await requestFilters(request),
+  });
+
+  return sendResponse(reply, data.results, { meta: { ...data.meta, ...retentionMeta(range) } });
+};
+
+/** Totals for the Outbound links page, with the preceding window for change. */
+export const getOutboundSummaryController = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+) => {
+  const range = await resolveWindow(request);
+  // Same comparison rule as top-stats: the preceding window of equal length,
+  // never before the retention floor.
+  const span = range.to - range.from;
+  const compareFrom = Math.max(range.from - span, range.retention.floor, 0);
+  const compareTo = Math.max(range.from, compareFrom);
+
+  const data = await getOutboundSummary(request.ctx, {
+    websiteId: request.website.id,
+    from: range.from,
+    to: range.to,
+    compareFrom,
+    compareTo,
+    kind: resolveLinkKind(request.query as { kind?: string }),
+    filters: await requestFilters(request),
+  });
+
+  return sendResponse(reply, { from: range.from, to: range.to, comparing_from: compareFrom, comparing_to: compareTo, ...data }, { meta: retentionMeta(range) });
+};
+
+/** Outbound clicks over time, for the page's trend chart. */
+export const getOutboundTimeseriesController = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+) => {
+  const query = request.query as AnalyticsQuery & { kind?: string };
+  const range = await resolveWindow(request);
+
+  const data = await getOutboundTimeseries(request.ctx, {
+    websiteId: request.website.id,
+    from: range.from,
+    to: range.to,
+    kind: resolveLinkKind(query),
+    interval: query.interval || "day",
+    timezone: request.website.timezone,
+    filters: await requestFilters(request),
+  });
+
+  return sendResponse(reply, data, { meta: retentionMeta(range) });
 };
 
 export const getCustomEventsController = async (

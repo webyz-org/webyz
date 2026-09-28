@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
-import { ArrowDown, ArrowUp, Search, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowDown, ArrowUp, Search } from "lucide-react";
 
 import PeriodPicker from "../features/dashboard/components/PeriodPicker";
 import FeatureGate from "../features/billing/components/FeatureGate";
@@ -21,6 +21,9 @@ import type {
   GscSortKey,
   GscTotals,
 } from "../features/search-console/types";
+import PageHeader from "../shared/components/PageHeader";
+import StatChange, { NewBadge } from "../shared/components/StatChange";
+import StatGrid from "../shared/components/StatGrid";
 
 const DIMENSIONS: Array<{ key: GscDimension; label: string; column: string }> = [
   { key: "query", label: "Queries", column: "Query" },
@@ -65,7 +68,7 @@ const ChangeBadge = ({
   let delta: number;
   let text: string;
   if (metric === "clicks" || metric === "impressions") {
-    if (previous === 0) return <span className="text-xs font-medium text-success">new</span>;
+    if (previous === 0) return <NewBadge />;
     delta = ((current - previous) / previous) * 100;
     text = `${Math.abs(delta).toFixed(1)}%`;
   } else {
@@ -75,20 +78,8 @@ const ChangeBadge = ({
   }
 
   if (Math.abs(delta) < 0.05) return null;
-  const up = delta > 0;
-  const good = metric === "position" ? !up : up;
-
-  return (
-    <span
-      className={
-        "flex items-center gap-0.5 text-xs " +
-        (good ? "text-success" : "text-danger")
-      }
-    >
-      {up ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-      {text}
-    </span>
-  );
+  // Position: lower is better, so a fall is the good direction.
+  return <StatChange delta={delta} text={text} good={metric === "position" ? delta < 0 : delta > 0} />;
 };
 
 export default function SearchConsolePage() {
@@ -199,19 +190,12 @@ export default function SearchConsolePage() {
 
   return (
     <div className="mx-auto max-w-[1280px] px-4 md:px-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 py-4">
-        <div>
-          <h1 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
-            {site.name} · Search
-          </h1>
-          <p className="mt-0.5 text-xs text-text-muted">
-            Google Search performance from Search Console. Google's data lags
-            by about two days.
-          </p>
-        </div>
-
-        <PeriodPicker value={period} from={from} to={to} onChange={setPeriod} />
-      </div>
+      <PageHeader
+        siteName={site.name}
+        title="Search"
+        description="Google Search performance from Search Console. Google's data lags by about two days."
+        actions={<PeriodPicker value={period} from={from} to={to} onChange={setPeriod} />}
+      />
 
       <FeatureGate
         feature="search_console"
@@ -290,33 +274,20 @@ export default function SearchConsolePage() {
       ) : (
         <>
           {/* ── Summary ────────────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-4">
-            {summaryCells.map((cell) => (
-              <div key={cell.label} className="bg-surface p-4">
-                <span className="text-xs uppercase tracking-wide text-text-muted">
-                  {cell.label}
-                </span>
-                <div className="mt-1 flex items-baseline justify-between gap-2">
-                  {result.isLoading && !data ? (
-                    <div className="h-6 w-14 animate-pulse rounded bg-black/5 dark:bg-white/10" />
-                  ) : (
-                    <>
-                      <span className="text-xl font-semibold">
-                        {cell.format((data?.summary as GscTotals)?.[cell.metric] ?? 0)}
-                      </span>
-                      {data && (
-                        <ChangeBadge
-                          metric={cell.metric}
-                          current={data.summary[cell.metric]}
-                          previous={data.previous[cell.metric]}
-                        />
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          <StatGrid
+            isLoading={result.isLoading && !data}
+            cells={summaryCells.map((cell) => ({
+              label: cell.label,
+              value: cell.format((data?.summary as GscTotals)?.[cell.metric] ?? 0),
+              change: data && (
+                <ChangeBadge
+                  metric={cell.metric}
+                  current={data.summary[cell.metric]}
+                  previous={data.previous[cell.metric]}
+                />
+              ),
+            }))}
+          />
 
           {/* ── Controls ───────────────────────────────────────────────────── */}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">

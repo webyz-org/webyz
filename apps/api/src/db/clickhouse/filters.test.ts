@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  OUTBOUND_EVENT_NAME,
+  buildOutboundRowFilters,
   buildSessionFilters,
   formatFilterValue,
   parseFilterValue,
@@ -96,5 +98,61 @@ describe("buildSessionFilters", () => {
     );
     assert.deepEqual(built, { columns: [], clauses: [], pageRestriction: "" });
     assert.deepEqual(params, {});
+  });
+});
+
+describe("outbound link filters", () => {
+  it("restricts sessions to those that clicked out to the destination", () => {
+    const params: Record<string, unknown> = {};
+    const built = buildSessionFilters(
+      {
+        outbound_domain: { op: "is", value: "github.com" },
+        outbound_url: { op: "not_contains", value: "utm_" },
+      },
+      params,
+    );
+    assert.equal(built.clauses.length, 0);
+    assert.match(
+      built.pageRestriction,
+      /session_id IN \([\s\S]*event_name = \{flt_outbound_event:String\} AND domainWithoutWWW\(meta\.value\[indexOf\(meta\.key, 'href'\)\]\) = \{flt_outbound_domain:String\}/,
+    );
+    assert.match(
+      built.pageRestriction,
+      /session_id NOT IN \([\s\S]*positionCaseInsensitive\(meta\.value\[indexOf\(meta\.key, 'href'\)\], \{flt_outbound_url:String\}\) > 0/,
+    );
+    assert.equal(params.flt_outbound_domain, "github.com");
+    assert.equal(params.flt_outbound_url, "utm_");
+    assert.equal(params.flt_outbound_event, OUTBOUND_EVENT_NAME);
+  });
+
+  it("restricts sessions by downloaded file and applies it row-level only to the download report", () => {
+    const params: Record<string, unknown> = {};
+    const built = buildSessionFilters({ download: { op: "contains", value: ".pdf" } }, params);
+    assert.match(
+      built.pageRestriction,
+      /event_name = \{flt_download_event:String\} AND positionCaseInsensitive\(meta\.value\[indexOf\(meta\.key, 'href'\)\], \{flt_download:String\}\) > 0/,
+    );
+    assert.equal(params.flt_download_event, "File Download");
+    const filters = { download: { op: "is" as const, value: "https://x.test/a.pdf" }, outbound_domain: { op: "is" as const, value: "github.com" } };
+    assert.match(buildOutboundRowFilters(filters, {}, "download"), /^\s*AND meta\.value\[indexOf\(meta\.key, 'href'\)\] = \{flt_download:String\}$/);
+    assert.match(buildOutboundRowFilters(filters, {}, "outbound"), /^\s*AND domainWithoutWWW.*flt_outbound_domain:String\}$/);
+  });
+
+  it("builds row predicates on the destination for the outbound report only", () => {
+    const params: Record<string, unknown> = {};
+    const clauses = buildOutboundRowFilters(
+      {
+        outbound_domain: { op: "is_not", value: "example.com" },
+        browser: { op: "is", value: "Chrome" },
+        page: { op: "is", value: "/" },
+      },
+      params,
+    );
+    assert.equal(
+      clauses.trim(),
+      "AND domainWithoutWWW(meta.value[indexOf(meta.key, 'href')]) != {flt_outbound_domain:String}",
+    );
+    assert.deepEqual(params, { flt_outbound_domain: "example.com" });
+    assert.equal(buildOutboundRowFilters({ browser: { op: "is", value: "Chrome" } }, {}), "");
   });
 });

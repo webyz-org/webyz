@@ -17,6 +17,7 @@ import type {
   PagesSortKey,
   PagesSortOrder,
 } from "../features/pages/types";
+import PageHeader from "../shared/components/PageHeader";
 
 const SORT_KEYS: PagesSortKey[] = [
   "views",
@@ -133,19 +134,12 @@ export default function PagesPage() {
 
   return (
     <div className="mx-auto max-w-[1280px] px-4 md:px-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 py-4">
-        <div>
-          <h1 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
-            {site.name} · Pages
-          </h1>
-          <p className="mt-0.5 text-xs text-text-muted">
-            Every tracked page and how it performs. Click a page for its
-            detailed view.
-          </p>
-        </div>
-
-        <PeriodPicker value={period} from={from} to={to} onChange={setPeriod} />
-      </div>
+      <PageHeader
+        siteName={site.name}
+        title="Pages"
+        description="Every tracked page and how it performs. Click a page for its detailed view."
+        actions={<PeriodPicker value={period} from={from} to={to} onChange={setPeriod} />}
+      />
 
       <RetentionNotice period={period} from={from} />
 

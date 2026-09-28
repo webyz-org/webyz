@@ -151,6 +151,25 @@ export default function ConversionCard({
   ];
 
   const noGoals = !conversions.isLoading && goalRows.length === 0;
+  const noEvents = !customEvents.isLoading && !customEvents.isError && eventRows.length === 0;
+
+  // Outbound links, file downloads and 404s are sent by the script once their
+  // attribute is on the tag; nothing here explains that otherwise, and the
+  // empty tab reads as "you must write code".
+  const automaticHint = (
+    <p className="mt-2 text-[12px] text-text-muted">
+      Outbound links, file downloads and 404 pages are counted with no code once ticked under the
+      snippet in{" "}
+      {siteDomain ? (
+        <Link to={`/sites/${siteDomain}/settings`} className="text-brand-ink hover:underline">
+          site settings
+        </Link>
+      ) : (
+        "site settings"
+      )}
+      .
+    </p>
+  );
 
   const propertyPicker = (
     <div className="flex items-center gap-2 px-1 pb-2 text-xs text-text-muted">
@@ -203,6 +222,7 @@ export default function ConversionCard({
                   Set up a goal
                 </Link>
               )}
+              {automaticHint}
             </div>
           )
         : undefined,
@@ -223,6 +243,18 @@ export default function ConversionCard({
         setPropertyKey(undefined);
         setOpen(false);
       },
+      renderCard: noEvents
+        ? () => (
+            <div className="py-6 text-center">
+              <p className="text-sm text-text-muted">No custom events in this period.</p>
+              <p className="mt-1 text-[12px] text-text-muted">
+                Send one with <code>webyz.event("Signup")</code> or{" "}
+                <code>data-analytics-event="Signup"</code> on any element.
+              </p>
+              {automaticHint}
+            </div>
+          )
+        : undefined,
     },
   ];
 

@@ -21,6 +21,7 @@ import {
 } from "../../../shared/lib/format";
 import { useGoalDetail } from "../hooks/useConversionsFeature";
 import type { PeriodWindow } from "../api";
+import StatGrid from "../../../shared/components/StatGrid";
 
 ChartJS.register(
   LineElement,
@@ -126,22 +127,7 @@ export default function GoalDetail({
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border lg:grid-cols-4">
-        {totals.map((cell) => (
-          <div key={cell.label} className="bg-surface p-4">
-            <span className="text-xs uppercase tracking-wide text-text-muted">
-              {cell.label}
-            </span>
-            <div className="mt-1 text-xl font-semibold">
-              {detail.isLoading && !data ? (
-                <div className="h-6 w-14 animate-pulse rounded bg-black/5 dark:bg-white/10" />
-              ) : (
-                cell.value
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
+      <StatGrid cells={totals} isLoading={detail.isLoading && !data} />
 
       <Section title="Conversions over time">
         <div className="h-52 w-full">

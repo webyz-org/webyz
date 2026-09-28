@@ -2,7 +2,10 @@ import type { AppContext } from "../../lib/context.js";
 import type { SessionDimension } from "../../db/clickhouse/breakdown.js";
 import type { AnalyticsFilters } from "../../db/clickhouse/filters.js";
 import { timeseriesQuery, type Interval } from "../../db/clickhouse/timeseries.js";
+import type { OutboundGroup } from "../../db/clickhouse/outbound.js";
+import type { LinkEventKind } from "../../db/clickhouse/filters.js";
 import { getBreakdown } from "./breakdown.service.js";
+import { getOutboundLinks } from "./outbound.service.js";
 import { bucketLabels, validateInterval } from "./main-graph.service.js";
 
 /**
@@ -37,11 +40,30 @@ export const BREAKDOWN_SEGMENTS: Record<string, SessionDimension | "page"> = {
 };
 
 /**
- * What can be exported. Every breakdown the dashboard shows, plus the
- * timeseries behind the main graph. One dataset per file: the dashboard
- * offers them as a menu, and a script can fetch exactly what it needs.
+ * Dataset name -> grouping of the outbound links report. Kept apart from the
+ * breakdown segments because the route table mounts one endpoint per segment
+ * and these three are groupings of a single endpoint (`outbound-links?by=`).
  */
-export const EXPORT_DATASETS = ["timeseries", ...Object.keys(BREAKDOWN_SEGMENTS)] as const;
+export const OUTBOUND_DATASETS: Record<string, { kind: LinkEventKind; by: OutboundGroup }> = {
+  "outbound-domains": { kind: "outbound", by: "domain" },
+  "outbound-links": { kind: "outbound", by: "url" },
+  "outbound-pages": { kind: "outbound", by: "page" },
+  "download-files": { kind: "download", by: "url" },
+  "download-types": { kind: "download", by: "type" },
+  "download-pages": { kind: "download", by: "page" },
+};
+
+/**
+ * What can be exported. Every breakdown the dashboard shows, the outbound
+ * links report in each of its groupings, plus the timeseries behind the main
+ * graph. One dataset per file: the dashboard offers them as a menu, and a
+ * script can fetch exactly what it needs.
+ */
+export const EXPORT_DATASETS = [
+  "timeseries",
+  ...Object.keys(BREAKDOWN_SEGMENTS),
+  ...Object.keys(OUTBOUND_DATASETS),
+] as const;
 export type ExportDataset = (typeof EXPORT_DATASETS)[number];
 
 export const isExportDataset = (value: string): value is ExportDataset =>
@@ -75,6 +97,7 @@ const exportInterval = (from: number, to: number): Interval =>
 
 export const getExportTable = async (ctx: AppContext, input: ExportInput): Promise<ExportTable> => {
   if (input.dataset === "timeseries") return timeseriesTable(ctx, input);
+  if (input.dataset in OUTBOUND_DATASETS) return outboundTable(ctx, input);
 
   const dimension = BREAKDOWN_SEGMENTS[input.dataset];
   const data = await getBreakdown(ctx, {
@@ -98,6 +121,30 @@ export const getExportTable = async (ctx: AppContext, input: ExportInput): Promi
       r.bounce_rate ?? null,
       r.visit_duration ?? null,
     ]),
+  };
+};
+
+/**
+ * The outbound links report in one grouping. `percentage` is the share of
+ * visitors who clicked out, `conversion_rate` the share of all visitors, as
+ * on the dashboard.
+ */
+const outboundTable = async (ctx: AppContext, input: ExportInput): Promise<ExportTable> => {
+  const { kind, by } = OUTBOUND_DATASETS[input.dataset];
+  const data = await getOutboundLinks(ctx, {
+    websiteId: input.websiteId,
+    from: input.from,
+    to: input.to,
+    kind,
+    by,
+    limit: EXPORT_ROW_LIMIT,
+    page: 1,
+    filters: input.filters,
+  });
+
+  return {
+    columns: [by, "visitors", "clicks", "percentage", "conversion_rate"],
+    rows: data.results.map((r) => [r.name, r.visitors, r.clicks, r.percentage, r.conversion_rate]),
   };
 };
 

@@ -29,6 +29,8 @@ import {
   formatDuration,
   formatPercent,
 } from "../shared/lib/format";
+import StatChange from "../shared/components/StatChange";
+import StatGrid from "../shared/components/StatGrid";
 
 ChartJS.register(
   LineElement,
@@ -162,17 +164,9 @@ export default function PageDetailPage() {
     {
       label: "Pageviews",
       value: formatCount(stats?.views ?? 0),
-      extra:
+      change:
         stats && stats.prev_views > 0 && stats.change !== 0 ? (
-          <span
-            className={
-              "text-xs font-medium " +
-              (stats.change > 0 ? "text-success" : "text-danger")
-            }
-          >
-            {stats.change > 0 ? "+" : ""}
-            {stats.change}%
-          </span>
+          <StatChange delta={stats.change} />
         ) : null,
     },
     { label: "Sessions", value: formatCount(stats?.sessions ?? 0) },
@@ -251,25 +245,7 @@ export default function PageDetailPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border md:grid-cols-3 lg:grid-cols-5">
-            {metricCards.map((card) => (
-              <div key={card.label} className="bg-surface p-4">
-                <span className="text-xs uppercase tracking-wide text-text-muted">
-                  {card.label}
-                </span>
-                <div className="mt-1 flex items-baseline gap-2">
-                  {detail.isLoading && !detail.data ? (
-                    <div className="h-6 w-14 animate-pulse rounded bg-black/5 dark:bg-white/10" />
-                  ) : (
-                    <>
-                      <span className="text-xl font-semibold">{card.value}</span>
-                      {"extra" in card ? card.extra : null}
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+          <StatGrid cells={metricCards} isLoading={detail.isLoading && !detail.data} />
 
           <div className="mt-4 rounded-xl border border-border bg-surface p-4">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-text-muted">

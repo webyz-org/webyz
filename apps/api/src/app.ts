@@ -70,6 +70,10 @@ export default fp(async (fastify: FastifyInstance, opts) => {
           done(null, CORS_ORIGINS.includes(origin));
         },
         credentials: true,
+        // The dashboard reads the CSV export's filename from this header;
+        // cross-origin (the hosted app./api. split, and dev) the browser
+        // hides it unless exposed, and every file fell back to "<dataset>.csv".
+        exposedHeaders: ["Content-Disposition"],
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       });
     },

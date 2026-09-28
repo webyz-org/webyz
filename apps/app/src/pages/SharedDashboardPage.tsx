@@ -8,6 +8,7 @@ import ContentsCard from "../features/dashboard/components/ContentsCard";
 import TechnologyCard from "../features/dashboard/components/TechnologyCard";
 import AcquisitionCard from "../features/dashboard/components/AcquisitionCard";
 import GeographyCard from "../features/dashboard/components/GeographyCard";
+import OutboundLinksCard from "../features/dashboard/components/OutboundLinksCard";
 import PeriodPicker from "../features/dashboard/components/PeriodPicker";
 import RealtimeBadge from "../features/dashboard/components/RealtimeBadge";
 import FilterBar from "../features/dashboard/components/FilterBar";
@@ -222,9 +223,12 @@ export default function SharedDashboardPage() {
           <AcquisitionCard scope={scope} />
         </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
+        <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <TechnologyCard scope={scope} />
           <GeographyCard scope={scope} />
+          {/* The API already answers outbound links to public viewers, so the
+              shared page shows them too; hiding the card would hide nothing. */}
+          <OutboundLinksCard scope={scope} />
         </div>
 
         {!options.embed && (

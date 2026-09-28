@@ -36,7 +36,7 @@ const COLUMNS: Array<{
 const ChangeBadge = ({ entry }: { entry: PageEntry }) => {
   if (entry.prev_views === 0) {
     return entry.views > 0 ? (
-      <span className="text-[11px] font-medium text-success">new</span>
+      <span className="text-[11px] font-medium text-trend-up">new</span>
     ) : null;
   }
   if (entry.change === 0) return null;
@@ -45,7 +45,7 @@ const ChangeBadge = ({ entry }: { entry: PageEntry }) => {
   return (
     <span
       className={
-        "text-[11px] font-medium " + (up ? "text-success" : "text-danger")
+        "text-[11px] font-medium " + (up ? "text-trend-up" : "text-trend-down")
       }
     >
       {up ? "+" : ""}

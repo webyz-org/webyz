@@ -55,8 +55,8 @@ export default function Insight({
             change === 0
               ? "shrink-0 text-text-muted"
               : change > 0
-                ? "shrink-0 text-[#0a7a4d] dark:text-emerald-400"
-                : "shrink-0 text-[#b3261e] dark:text-red-400"
+                ? "shrink-0 text-trend-up"
+                : "shrink-0 text-trend-down"
           }
         />
         <span className="min-w-0">

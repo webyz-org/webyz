@@ -47,6 +47,39 @@ export const sortItems = (items: readonly ChangeItem[]): ChangeItem[] =>
 
 export const RELEASES: Release[] = [
   {
+    slug: "outbound-links",
+    date: "2026-09-25",
+    title: "Where visitors leave to",
+    summary:
+      "The script could already count clicks on links to other sites. Now the dashboard has a place to read them.",
+    items: [
+      {
+        kind: "new",
+        text: "An Outbound links card on the dashboard: destinations grouped by domain, each opening into the exact links, and the pages the clicks came from. Every row shows visitors, clicks, and in the expanded view the click-through rate over all visitors, the same way a goal reads.",
+      },
+      {
+        kind: "new",
+        text: "Clicking a destination filters the whole dashboard to the sessions that clicked out to it, so which sources or pages send people to the app store is one click away. The two filters (outbound domain, outbound link) work in the filter form, in saved segments and on the API, and each grouping exports as CSV.",
+      },
+      {
+        kind: "new",
+        text: "An Outbound page in the site navigation: totals against the previous period, clicks over time, the full lists of destinations, links and pages, and, once you click a destination, who clicks out to it by source, country, device and browser. File downloads get a filter of their own and three CSV exports: files, file types, and the pages they were taken from.",
+      },
+      {
+        kind: "improved",
+        text: "The script stores an outbound destination without its fragment, can drop the query string, records the link's label so two links to one address can be told apart, and lets you list hosts to keep internal, including your own subdomains. A click never waits more than 300 ms for its beacon before the page moves on.",
+      },
+      {
+        kind: "improved",
+        text: "The install snippet has tick boxes for outbound links, file downloads and 404 pages that write the right attribute for you. Outbound links is ticked by default; the other two stay off, because each download or 404 is an event that counts towards your allowance.",
+      },
+      {
+        kind: "improved",
+        text: "Every page in a site's navigation now shows changes against the previous period in the same green and red as the Overview, in light and dark mode, and the site pages share one header and one style of summary card.",
+      },
+    ],
+  },
+  {
     slug: "blog-and-changelog",
     date: "2026-09-18",
     title: "A blog, and this page",

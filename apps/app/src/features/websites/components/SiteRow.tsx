@@ -41,8 +41,8 @@ function Change({ stat }: { stat?: TopStat }) {
       className={
         "inline-flex items-center gap-px font-medium " +
         (good
-          ? "text-[#0a7a4d] dark:text-emerald-400"
-          : "text-[#b3261e] dark:text-red-400")
+          ? "text-trend-up"
+          : "text-trend-down")
       }
     >
       {isUp ? (

@@ -12,8 +12,13 @@
  *   data-hash-routing    "true" for apps that route on the fragment (/#/about):
  *                        the fragment becomes part of the path and a
  *                        hashchange counts as a pageview
- *   data-outbound-links  "true" to send "Outbound Link: Click" (prop: href)
- *                        for clicks on links to other hosts
+ *   data-outbound-links  "true" to send "Outbound Link: Click" (props: href,
+ *                        text) for clicks on links to other hosts. The
+ *                        fragment is never stored; data-outbound-strip-query
+ *                        "true" drops the query string too, and
+ *                        data-outbound-ignore is a comma list of hosts not to
+ *                        count ("cdn.example.com,*.example.com" keeps the
+ *                        site's own subdomains internal)
  *   data-file-downloads  "true" to send "File Download" (prop: href) for
  *                        clicks on links to files; data-file-types overrides
  *                        the extension list ("pdf,zip,...")
@@ -43,6 +48,8 @@
     excludeHash: false,
     hashRouting: false,
     outboundLinks: false,
+    outboundIgnore: [],
+    outboundStripQuery: false,
     fileDownloads: false,
     fileTypes: [],
     track404: false,
@@ -71,6 +78,12 @@
   };
 
   var OPT_OUT_KEY = "webyz-disabled";
+  // Longest a link click waits for its beacon before the page navigates.
+  var NAVIGATION_HOLD_MS = 300;
+  // A second click on the same link within this window is the same intent
+  // (a double-click, an impatient re-click while the page is leaving) and is
+  // not counted again.
+  var REPEAT_CLICK_MS = 500;
   var DNT_VALUES = ["1", 1, "yes", true];
 
   var utils = {
@@ -408,6 +421,9 @@
   };
 
   var autotrack = {
+    /** The last counted link click, for REPEAT_CLICK_MS. In memory only. */
+    lastLinkClick: null,
+
     init: function () {
       if (!config.autoTrack) return;
       autotrack.setupPageviews();
@@ -477,6 +493,47 @@
       tracker.event("404", { page: location.pathname });
     },
 
+    /**
+     * Is this host on the data-outbound-ignore list? An entry is an exact
+     * host, or "*.example.com" for every subdomain of one.
+     */
+    isIgnoredHost: function (hostname) {
+      var list = config.outboundIgnore;
+      for (var i = 0; i < list.length; i++) {
+        var entry = list[i];
+        if (entry.indexOf("*.") === 0) {
+          var suffix = entry.slice(1);
+          if (hostname.slice(-suffix.length) === suffix) return true;
+        } else if (entry === hostname) {
+          return true;
+        }
+      }
+      return false;
+    },
+
+    /**
+     * The destination as it is stored: never the fragment (it is client-side
+     * state, not a different page), and without the query when configured,
+     * because query strings are where tokens and personal data end up.
+     */
+    storedHref: function (target) {
+      return (
+        target.origin +
+        target.pathname +
+        (config.outboundStripQuery ? "" : target.search)
+      );
+    },
+
+    /** The link's visible label, so two links to one URL can be told apart. */
+    linkText: function (element) {
+      var text =
+        element.textContent ||
+        element.getAttribute("aria-label") ||
+        element.getAttribute("title") ||
+        "";
+      return text.replace(/\s+/g, " ").trim().slice(0, 100);
+    },
+
     /** Which auto event, if any, a click on this link produces. */
     classifyLink: function (element) {
       var href = element.href;
@@ -492,18 +549,45 @@
         return null;
       }
 
+      var text = autotrack.linkText(element);
+
       if (config.fileDownloads) {
         var match = /\.([a-z0-9]+)$/i.exec(target.pathname);
         if (match && config.fileTypes.indexOf(match[1].toLowerCase()) !== -1) {
-          return { name: "File Download", props: { href: target.href } };
+          var fileProps = { href: autotrack.storedHref(target) };
+          if (text) fileProps.text = text;
+          return { name: "File Download", props: fileProps };
         }
       }
 
-      if (config.outboundLinks && target.hostname !== location.hostname) {
-        return { name: "Outbound Link: Click", props: { href: target.href } };
+      if (
+        config.outboundLinks &&
+        target.hostname !== location.hostname &&
+        !autotrack.isIgnoredHost(target.hostname)
+      ) {
+        var props = { href: autotrack.storedHref(target) };
+        if (text) props.text = text;
+        return { name: "Outbound Link: Click", props: props };
       }
 
       return null;
+    },
+
+    /**
+     * Hold navigation only until the beacon is out, and never longer than
+     * NAVIGATION_HOLD_MS: the request is sent with keepalive, so it survives
+     * the page being left, and a slow network must not make a link feel
+     * broken. The same cap applies to data-analytics-event links.
+     */
+    navigateAfter: function (sending, href) {
+      var done = false;
+      var go = function () {
+        if (done) return;
+        done = true;
+        location.href = href;
+      };
+      sending.then(go, go);
+      setTimeout(go, NAVIGATION_HOLD_MS);
     },
 
     /**
@@ -524,6 +608,14 @@
       // The page cancelled the navigation; count nothing the visitor did not do.
       if (event.defaultPrevented) return;
 
+      // Same link again within REPEAT_CLICK_MS: already counted. The browser
+      // is left to do whatever it does with the click (open a second tab, or
+      // start the same navigation the first click already scheduled).
+      var now = Date.now();
+      var last = autotrack.lastLinkClick;
+      if (last && last.href === auto.props.href && now - last.at < REPEAT_CLICK_MS) return;
+      autotrack.lastLinkClick = { href: auto.props.href, at: now };
+
       var opensElsewhere =
         element.target === "_blank" ||
         element.hasAttribute("download") ||
@@ -535,10 +627,7 @@
       if (!opensElsewhere) {
         // Same trick as handleClick: hold navigation until the beacon is out.
         event.preventDefault();
-        var href = element.href;
-        tracker.event(auto.name, auto.props).then(function () {
-          location.href = href;
-        });
+        autotrack.navigateAfter(tracker.event(auto.name, auto.props), element.href);
         return;
       }
 
@@ -575,10 +664,7 @@
       if (isAnchor && !opensElsewhere) {
         // Delay navigation just long enough to get the beacon out.
         event.preventDefault();
-        var href = element.href;
-        tracker.event(eventName, props).then(function () {
-          location.href = href;
-        });
+        autotrack.navigateAfter(tracker.event(eventName, props), element.href);
         return;
       }
 
@@ -608,6 +694,13 @@
       config.excludeHash = attr("data-exclude-hash") === "true";
       config.hashRouting = attr("data-hash-routing") === "true";
       config.outboundLinks = attr("data-outbound-links") === "true";
+      config.outboundIgnore = (attr("data-outbound-ignore") || "")
+        .split(",")
+        .map(function (s) {
+          return s.trim().toLowerCase();
+        })
+        .filter(Boolean);
+      config.outboundStripQuery = attr("data-outbound-strip-query") === "true";
       config.fileDownloads = attr("data-file-downloads") === "true";
       config.fileTypes = (attr("data-file-types") || "")
         .split(",")

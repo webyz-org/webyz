@@ -65,12 +65,62 @@ const SESSION_FILTERS = {
 export type SessionFilterKey = keyof typeof SESSION_FILTERS;
 
 /**
- * `page` and `event` are not session attributes: they restrict to sessions
- * that viewed the page, or fired the custom event, at least once, via the
- * events table. A `goal` filter from the API is resolved by the controller
- * into one of these two before it gets here.
+ * Outbound link clicks are the tracker's `Outbound Link: Click` event with
+ * the destination in the `href` property (docs/tracker.md). The three
+ * expressions below are the only place that shape is written down: the
+ * outbound report groups by them and the filters match against them, so a
+ * row's label always filters back to exactly that row.
  */
-export type EventFilterKey = "page" | "event";
+export const OUTBOUND_EVENT_NAME = "Outbound Link: Click";
+
+/**
+ * File downloads are the same shape: the tracker's `File Download` event
+ * with the file's URL in `href`. The outbound report serves both, chosen by
+ * a `kind`, so downloads get the same groupings, totals and trend.
+ */
+export const DOWNLOAD_EVENT_NAME = "File Download";
+
+export type LinkEventKind = "outbound" | "download";
+
+export const LINK_EVENT_NAMES: Record<LinkEventKind, string> = {
+  outbound: OUTBOUND_EVENT_NAME,
+  download: DOWNLOAD_EVENT_NAME,
+};
+
+export const isLinkEventKind = (value: string): value is LinkEventKind =>
+  value === "outbound" || value === "download";
+
+/** The destination URL, read from the parallel meta arrays ('' when absent). */
+export const OUTBOUND_HREF_EXPR = "meta.value[indexOf(meta.key, 'href')]";
+
+/**
+ * The destination's host without a leading www., so links to example.com and
+ * www.example.com sit under one row. `domainWithoutWWW()` drops the scheme,
+ * port, credentials and path and yields '' for anything that is not a URL.
+ * (Not `cutWWW(domain(...))`: cutWWW takes a URL, and given a bare host it
+ * returns it unchanged, verified against ClickHouse 24.8.)
+ */
+export const OUTBOUND_DOMAIN_EXPR = `domainWithoutWWW(${OUTBOUND_HREF_EXPR})`;
+
+/** Each link filter: the expression it matches and the event it lives on. */
+const LINK_FILTERS = {
+  outbound_domain: { expr: OUTBOUND_DOMAIN_EXPR, kind: "outbound" },
+  outbound_url: { expr: OUTBOUND_HREF_EXPR, kind: "outbound" },
+  download: { expr: OUTBOUND_HREF_EXPR, kind: "download" },
+} as const satisfies Record<string, { expr: string; kind: LinkEventKind }>;
+
+export type OutboundFilterKey = keyof typeof LINK_FILTERS;
+
+const isOutboundKey = (key: string): key is OutboundFilterKey => key in LINK_FILTERS;
+
+/**
+ * `page`, `event` and the link keys are not session attributes: they
+ * restrict to sessions that viewed the page, fired the custom event, clicked
+ * out to the destination or downloaded the file, at least once, via the
+ * events table. A `goal` filter from the API is resolved by the controller
+ * into `page` or `event` before it gets here.
+ */
+export type EventFilterKey = "page" | "event" | OutboundFilterKey;
 export type FilterKey = SessionFilterKey | EventFilterKey;
 
 export type AnalyticsFilters = Partial<Record<FilterKey, FilterCondition>>;
@@ -79,6 +129,9 @@ export const FILTER_KEYS = [
   ...(Object.keys(SESSION_FILTERS) as SessionFilterKey[]),
   "page",
   "event",
+  "outbound_domain",
+  "outbound_url",
+  "download",
 ] as const satisfies readonly FilterKey[];
 
 export const isFilterKey = (key: string): key is FilterKey =>
@@ -225,6 +278,20 @@ export const buildSessionFilters = (
       continue;
     }
 
+    if (isOutboundKey(key)) {
+      const { expr, kind: eventKind } = LINK_FILTERS[key];
+      const param = `flt_${key}`;
+      const eventParam = `flt_${eventKind}_event`;
+      queryParams[param] = value;
+      queryParams[eventParam] = LINK_EVENT_NAMES[eventKind];
+      pageRestriction += eventsRestriction(
+        `event_type = 'event' AND event_name = {${eventParam}:String} AND ${predicate(expr, positiveOp, param)}`,
+        isNegative(op),
+        time,
+      );
+      continue;
+    }
+
     const spec: FilterSpec | undefined = SESSION_FILTERS[key as SessionFilterKey];
     if (!spec) continue;
 
@@ -271,4 +338,32 @@ export const buildEventsSessionRestriction = (
             GROUP BY session_id
           ) ${where}
         )`;
+};
+
+/**
+ * Row-level predicates for a query over the link events themselves: "" or
+ * `AND ...` clauses on the destination of each click, for the filters that
+ * live on the given kind of event. The session restriction above answers
+ * "sessions that clicked out to X"; this answers "the clicks to X", which is
+ * what the report needs once a destination is filtered (the URLs of that
+ * domain, the pages that link to that URL). A download filter on the
+ * outbound report, or the reverse, stays a session restriction only. Values
+ * are bound under the same `flt_` names, so a query may use both builders on
+ * one parameter object.
+ */
+export const buildOutboundRowFilters = (
+  filters: AnalyticsFilters | undefined,
+  queryParams: Record<string, unknown>,
+  kind: LinkEventKind = "outbound",
+): string => {
+  let clauses = "";
+  for (const [key, condition] of Object.entries(filters ?? {})) {
+    if (!condition || condition.value === "" || !isOutboundKey(key)) continue;
+    const { expr, kind: eventKind } = LINK_FILTERS[key];
+    if (eventKind !== kind) continue;
+    const param = `flt_${key}`;
+    queryParams[param] = condition.value;
+    clauses += `\n        AND ${predicate(expr, condition.op, param)}`;
+  }
+  return clauses;
 };

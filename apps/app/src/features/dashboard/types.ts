@@ -100,6 +100,53 @@ export type CustomEventProperty = {
   percentage: number;
 };
 
+// ─── Outbound links ──────────────────────────────────────────────────────────
+
+/** Which link event a report reads: outbound clicks or file downloads. */
+export type LinkEventKind = "outbound" | "download";
+
+/** Grouping of the link report: destination host, full URL, source page, or file extension. */
+export type OutboundGroup = "domain" | "url" | "page" | "type";
+
+export type OutboundRow = {
+  name: string;
+  visitors: number;
+  clicks: number;
+  /** Share of visitors who clicked out at all; drives the bar. */
+  percentage: number;
+  /** Share of every visitor in the period: the click-through rate. */
+  conversion_rate: number;
+};
+
+export type OutboundTotals = {
+  clicks: number;
+  visitors: number;
+  destinations: number;
+  /** Distinct destination URLs: the files, for downloads. */
+  urls: number;
+  pages: number;
+  clicks_per_visitor: number;
+  /** Visitors who clicked out over all visitors, in percent. */
+  click_rate: number;
+  site_visitors: number;
+};
+
+export type OutboundSummary = OutboundTotals & {
+  from: number;
+  to: number;
+  comparing_from: number;
+  comparing_to: number;
+  previous: OutboundTotals;
+};
+
+export type OutboundTimeseries = {
+  labels: string[];
+  clicks: number[];
+  visitors: number[];
+  interval: string;
+  timezone: string;
+};
+
 // ─── Journeys ────────────────────────────────────────────────────────────────
 
 export type JourneyMetric = "users" | "sessions";

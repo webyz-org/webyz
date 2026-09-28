@@ -3,6 +3,7 @@ import {
   Check,
   ChevronDown,
   CreditCard,
+  ExternalLink,
   FileText,
   Globe2,
   KeyRound,
@@ -86,6 +87,7 @@ export default function MainLayout() {
     ? [
         { name: "Overview", to: siteBase, icon: LayoutGrid },
         { name: "Pages", to: `${siteBase}/pages`, icon: FileText },
+        { name: "Outbound", to: `${siteBase}/outbound`, icon: ExternalLink },
         ...(included("search_console") ? [{ name: "Search", to: `${siteBase}/search`, icon: SearchCheck }] : []),
         { name: "Realtime", to: `${siteBase}/realtime`, icon: Radio },
         ...(included("journeys") ? [{ name: "Journeys", to: `${siteBase}/journeys`, icon: Route }] : []),

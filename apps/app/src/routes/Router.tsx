@@ -4,6 +4,7 @@ import DashboardPage from "../pages/DashboardPage";
 import JourneysPage from "../pages/JourneysPage";
 import PagesPage from "../pages/PagesPage";
 import PageDetailPage from "../pages/PageDetailPage";
+import OutboundLinksPage from "../pages/OutboundLinksPage";
 import RealtimePage from "../pages/RealtimePage";
 import SearchConsolePage from "../pages/SearchConsolePage";
 import ConversionsPage from "../pages/ConversionsPage";
@@ -54,6 +55,7 @@ export default function Router() {
         <Route path="/sites/:domain" element={<DashboardPage />} />
         <Route path="/sites/:domain/pages" element={<PagesPage />} />
         <Route path="/sites/:domain/pages/detail" element={<PageDetailPage />} />
+        <Route path="/sites/:domain/outbound" element={<OutboundLinksPage />} />
         <Route path="/sites/:domain/journeys" element={<JourneysPage />} />
         <Route path="/sites/:domain/conversions" element={<ConversionsPage />} />
         <Route path="/sites/:domain/search" element={<SearchConsolePage />} />

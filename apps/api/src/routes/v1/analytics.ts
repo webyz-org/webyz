@@ -9,6 +9,9 @@ import {
   getCustomEventsController,
   getJourneysController,
   getMainGraphController,
+  getOutboundLinksController,
+  getOutboundSummaryController,
+  getOutboundTimeseriesController,
   getPageDetailController,
   getPagesController,
   getRealtimeController,
@@ -69,6 +72,10 @@ export default async function analyticsRoutes(fastify: FastifyInstance) {
     getJourneysController,
   );
   fastify.get("/:siteId/custom-events", guard, getCustomEventsController);
+  // Outbound link clicks by destination domain, destination URL or source page.
+  fastify.get("/:siteId/outbound-links", guard, getOutboundLinksController);
+  fastify.get("/:siteId/outbound-links/summary", guard, getOutboundSummaryController);
+  fastify.get("/:siteId/outbound-links/timeseries", guard, getOutboundTimeseriesController);
   // Custom event properties: keys for an event, or values of one key.
   fastify.get(
     "/:siteId/custom-events/properties",

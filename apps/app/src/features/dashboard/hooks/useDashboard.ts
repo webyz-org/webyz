@@ -8,6 +8,9 @@ import {
   getFilteredTraffic,
   getJourneys,
   getMainGraph,
+  getOutboundLinks,
+  getOutboundSummary,
+  getOutboundTimeseries,
   getRealtime,
   getTopStats,
   type AnalyticsScope,
@@ -15,7 +18,9 @@ import {
 import type {
   DimensionKey,
   JourneyMetric,
+  LinkEventKind,
   MainGraphResponse,
+  OutboundGroup,
 } from "../types";
 
 /** Shared cache key prefix so a site's analytics can be invalidated together. */
@@ -130,6 +135,40 @@ export const useBreakdown = (
     enabled: enabled && enabledFor(scope),
   });
 };
+
+/**
+ * The outbound links report in one grouping. Like useBreakdown, `enabled`
+ * lets the card fetch only the visible tab and the modal's longer list only
+ * while it is open.
+ */
+export const useOutboundLinks = (
+  scope: AnalyticsScope,
+  by: OutboundGroup,
+  options: { limit?: number; enabled?: boolean; kind?: LinkEventKind } = {},
+) => {
+  const { limit, enabled = true, kind = "outbound" } = options;
+
+  return useQuery({
+    queryKey: [...scopeKey(scope), "outbound-links", kind, by, limit ?? null],
+    queryFn: () => getOutboundLinks(scope, by, { limit, kind }),
+    enabled: enabled && enabledFor(scope),
+  });
+};
+
+export const useOutboundSummary = (scope: AnalyticsScope, kind: LinkEventKind = "outbound") =>
+  useQuery({
+    queryKey: [...scopeKey(scope), "outbound-summary", kind],
+    queryFn: () => getOutboundSummary(scope, kind),
+    enabled: enabledFor(scope),
+  });
+
+export const useOutboundTimeseries = (scope: AnalyticsScope, interval: string, kind: LinkEventKind = "outbound") =>
+  useQuery({
+    queryKey: [...scopeKey(scope), "outbound-timeseries", kind, interval],
+    queryFn: () => getOutboundTimeseries(scope, interval, kind),
+    enabled: enabledFor(scope),
+    placeholderData: (previous) => previous,
+  });
 
 export const useJourneys = (
   scope: AnalyticsScope,

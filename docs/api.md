@@ -58,9 +58,9 @@ Every analytics endpoint takes the same time parameters, resolved in the **site'
 | `date` | `YYYY-MM-DD`, shifts `today`, `yesterday`, `this_month` and friends to be relative to that day |
 | `from`, `to` | `YYYY-MM-DD`, required with `period=custom`; `to` is inclusive |
 
-Drill-down filters are `f.<key>` parameters whose values are the labels the dashboard shows, so `f.browser=Chrome`, `f.country=DE`, `f.channel=Organic Search`, `f.page=/pricing`. Keys: `page`, `entry_page`, `exit_page`, `event` (sessions that fired the custom event), `goal` (a goal's name, resolved to its event or page), `browser`, `browser_version`, `os`, `os_version`, `device`, `screen`, `language`, `channel`, `source`, `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `country`, `region`, `city`. Unknown keys are ignored.
+Drill-down filters are `f.<key>` parameters whose values are the labels the dashboard shows, so `f.browser=Chrome`, `f.country=DE`, `f.channel=Organic Search`, `f.page=/pricing`. Keys: `page`, `entry_page`, `exit_page`, `event` (sessions that fired the custom event), `goal` (a goal's name, resolved to its event or page), `outbound_domain` and `outbound_url` (sessions that clicked an outbound link to that host, without a leading `www.`, or to that exact URL), `download` (sessions that downloaded that file URL; `~.pdf` for a type), `browser`, `browser_version`, `os`, `os_version`, `device`, `screen`, `language`, `channel`, `source`, `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `utm_term`, `country`, `region`, `city`. Unknown keys are ignored.
 
-A value is an exact match unless it starts with an operator prefix: `!` is not (`f.browser=!Chrome`), `~` contains (`f.page=~/blog`), `!~` does not contain (`f.page=!~/admin`). Substring matches ignore case. A literal value that itself begins with `!`, `~` or `=` is written with a `=` right after the operator marker (`f.page==!weird`, `f.page=!=~weird`). For `page` and `event`, a negative operator means sessions that never viewed a matching page or fired a matching event. One condition per key.
+A value is an exact match unless it starts with an operator prefix: `!` is not (`f.browser=!Chrome`), `~` contains (`f.page=~/blog`), `!~` does not contain (`f.page=!~/admin`). Substring matches ignore case. A literal value that itself begins with `!`, `~` or `=` is written with a `=` right after the operator marker (`f.page==!weird`, `f.page=!=~weird`). For `page`, `event`, the outbound keys and `download`, a negative operator means sessions that never viewed a matching page, fired a matching event, clicked out to a matching destination or downloaded a matching file. One condition per key.
 
 Paged endpoints take `limit` (1 to 100, default 10) and `page` (default 1).
 
@@ -122,12 +122,15 @@ All under `/:siteId/`. Readable by the owner, any team member, or anyone when th
 | `conversions` | filters | Goal conversions for the period |
 | `custom-events` | filters | Custom event names with counts |
 | `custom-events/properties` | `event` (required), `key`, `limit`, filters | Without `key`: the property keys the event carried, each with `visitors`, `events`, `percentage` of the event's visitors. With `key`: that property's values |
+| `outbound-links/summary` | `kind`, filters | Totals for the period with the preceding window under `previous`: `clicks`, `visitors`, `destinations` (distinct hosts), `urls` (distinct URLs, the files for downloads), `pages`, `clicks_per_visitor`, `click_rate` (visitors who clicked over all visitors, percent), `site_visitors` |
+| `outbound-links/timeseries` | `kind`, `interval` (`hour`, `day`, `week`, `month`; widened automatically), filters | `labels`, `clicks` and `visitors` arrays, one entry per bucket |
+| `outbound-links` | `kind` (`outbound` default, `download`), `by` (`domain` default, `url`, `page`, `type`), `limit`, `page`, filters | Link clicks grouped by destination host without `www.`, by full destination URL, by the page clicked from, or by the destination's file extension. `kind=outbound` reads the tracker's `Outbound Link: Click` event, `kind=download` its `File Download` event (see the tracker guide). Rows: `name`, `visitors`, `clicks`, `percentage` (of visitors who clicked), `conversion_rate` (of all visitors, the click-through or download rate). Meta: `kind`, `total_visitors`, `total_clicks`, `site_visitors`, `total_items`, `has_more`. An `outbound_domain` or `outbound_url` filter also narrows the outbound rows themselves to that destination's clicks, and a `download` filter the download rows to that file |
 | `journeys` | `metric` (`users`, `sessions`), `depth`, `startingPath`, filters | Path transitions between pages; needs the Journeys entitlement |
 | `export` | `dataset`, period, filters | **CSV**, owner or member only; see below |
 
 ### Export
 
-`GET /:siteId/export?dataset=<name>&period=...` returns `text/csv` as an attachment, up to 10,000 rows. `dataset` is `timeseries` (one row per day, or per hour for windows of two days or less, with all six metrics) or any breakdown path above (`browsers`, `countries`, `top-pages`, ...). Filters apply. Requires the Exports entitlement.
+`GET /:siteId/export?dataset=<name>&period=...` returns `text/csv` as an attachment, up to 10,000 rows. `dataset` is `timeseries` (one row per day, or per hour for windows of two days or less, with all six metrics), any breakdown path above (`browsers`, `countries`, `top-pages`, ...), or the link reports as `outbound-domains`, `outbound-links`, `outbound-pages`, `download-files`, `download-types` or `download-pages`. Filters apply. Requires the Exports entitlement.
 
 ```bash
 curl -H "Authorization: Bearer $WEBYZ_KEY" -o browsers.csv \

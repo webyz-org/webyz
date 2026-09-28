@@ -24,6 +24,7 @@ import { useSiteByDomain } from "../features/websites/hooks/useWebsite";
 import { usePeriod } from "../shared/hooks/usePeriod";
 import { formatCount } from "../shared/lib/format";
 import type { FunnelMetric } from "../features/conversions/types";
+import PageHeader from "../shared/components/PageHeader";
 
 /**
  * Conversions: Goals (what converts and who converts) and Funnels (where
@@ -108,59 +109,55 @@ export default function ConversionsPage() {
 
   return (
     <div className="mx-auto max-w-[1280px] px-4 md:px-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 py-4">
-        <div>
-          <h1 className="text-sm font-semibold uppercase tracking-wide text-text-secondary">
-            {site.name} · Conversions
-          </h1>
-          <p className="mt-0.5 text-xs text-text-muted">
-            Goal completions and funnel drop-off, from your real events.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <div
-            className="flex overflow-hidden rounded-md border border-border"
-            role="group"
-            aria-label="Conversions view"
-          >
-            {(["goals", "funnels"] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setParams({ tab: t === "goals" ? null : t })}
-                aria-pressed={tab === t}
-                className={
-                  "px-3 py-2 text-sm capitalize " +
-                  (tab === t
-                    ? "bg-primary font-medium text-primary-foreground"
-                    : "hover:bg-black/[0.03] dark:hover:bg-white/[0.05]")
-                }
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-
-          {tab === "funnels" && (
-            <select
-              value={metric}
-              onChange={(e) =>
-                setParams({
-                  metric: e.target.value === "sessions" ? "sessions" : null,
-                })
-              }
-              className="h-9 rounded-md border border-border bg-surface px-2 text-sm outline-none"
-              aria-label="Funnel metric"
+      <PageHeader
+        siteName={site.name}
+        title="Conversions"
+        description="Goal completions and funnel drop-off, from your real events."
+        actions={
+          <>
+            <div
+              className="flex overflow-hidden rounded-md border border-border"
+              role="group"
+              aria-label="Conversions view"
             >
-              <option value="visitors">Visitors</option>
-              <option value="sessions">Sessions</option>
-            </select>
-          )}
+              {(["goals", "funnels"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setParams({ tab: t === "goals" ? null : t })}
+                  aria-pressed={tab === t}
+                  className={
+                    "px-3 py-2 text-sm capitalize " +
+                    (tab === t
+                      ? "bg-primary font-medium text-primary-foreground"
+                      : "hover:bg-black/[0.03] dark:hover:bg-white/[0.05]")
+                  }
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
 
-          <PeriodPicker value={period} from={from} to={to} onChange={setPeriod} />
-        </div>
-      </div>
+            {tab === "funnels" && (
+              <select
+                value={metric}
+                onChange={(e) =>
+                  setParams({
+                    metric: e.target.value === "sessions" ? "sessions" : null,
+                  })
+                }
+                className="h-9 rounded-md border border-border bg-surface px-2 text-sm outline-none"
+                aria-label="Funnel metric"
+              >
+                <option value="visitors">Visitors</option>
+                <option value="sessions">Sessions</option>
+              </select>
+            )}
+
+            <PeriodPicker value={period} from={from} to={to} onChange={setPeriod} />
+          </>
+        }
+      />
 
       <RetentionNotice period={period} from={from} />
 
