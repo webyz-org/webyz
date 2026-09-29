@@ -15,9 +15,38 @@
  * keeps working unchanged.
  */
 
+import {
+  AI_ASSISTANT_CHANNEL,
+  AI_ASSISTANT_HOSTS,
+} from "../../ingest/helpers/ai-assistants.js";
+
 export type FilterOperator = "is" | "is_not" | "contains" | "not_contains";
 
 export type FilterCondition = { op: FilterOperator; value: string };
+
+/**
+ * The channel label as the dashboard renders it. Old rows store '' for direct
+ * traffic. Sessions recorded before the AI Assistants channel existed were
+ * classified Referral (assistant referrer) or Other Campaign (assistant
+ * utm_source, no referrer); the same host list regroups them here, so the
+ * channel covers history and a host added to the list applies backwards.
+ * Every other stored channel is final: a paid medium still wins.
+ */
+const AI_HOSTS_SQL = `[${AI_ASSISTANT_HOSTS.map((host) => {
+  if (!/^[a-z0-9.-]+$/.test(host)) throw new Error(`bad AI assistant host: ${host}`);
+  return `'${host}'`;
+}).join(", ")}]`;
+
+const UTM_SOURCE_HOST_SQL =
+  "if(startsWith(lower(trimBoth(utm_source)), 'www.'), substring(lower(trimBoth(utm_source)), 5), lower(trimBoth(utm_source)))";
+
+export const CHANNEL_SPEC = {
+  columns: ["channel", "referrer_domain", "utm_source"],
+  expr:
+    "multiIf(channel = '', 'Direct', " +
+    `channel IN ('Referral', 'Other Campaign') AND (has(${AI_HOSTS_SQL}, lower(referrer_domain)) OR has(${AI_HOSTS_SQL}, ${UTM_SOURCE_HOST_SQL})), '${AI_ASSISTANT_CHANNEL}', ` +
+    "channel)",
+};
 
 type FilterSpec = {
   /** Session columns that must survive argMax deduplication for the match. */
@@ -45,9 +74,8 @@ const SESSION_FILTERS = {
   language: col("language"),
   entry_page: col("entry_page"),
   exit_page: col("exit_page"),
-  // Old rows store '' for direct traffic, new rows the literal label, and the
-  // breakdown renders both the same way; match on the rendered label.
-  channel: { columns: ["channel"], expr: "if(channel = '', 'Direct', channel)" },
+  // Match on the rendered label, which regroups old rows (CHANNEL_SPEC).
+  channel: CHANNEL_SPEC,
   source: {
     columns: ["referrer_domain"],
     expr: "if(referrer_domain = '', '(direct)', referrer_domain)",

@@ -41,7 +41,7 @@ const VIEWS = [
 const AUDIENCES = [
   { title: "Founders", text: "One page that answers whether the launch worked: visitors, where they came from, what they read and whether they signed up. Six stats above the fold, no configuration, no training." },
   { title: "Developers", text: "One script tag, 6.3 KB gzipped. Postgres, ClickHouse and Redis under the hood, self-hostable, and a plain data model you can query yourself." },
-  { title: "Marketers", text: "Channels, sources and UTM breakdowns, filters that live in the URL so a view is a link, and goals that count the page visits and events that matter." },
+  { title: "Marketers", text: "Channels, sources and UTM breakdowns, with visits from AI assistants such as ChatGPT and Perplexity as a channel of their own, filters that live in the URL so a view is a link, and goals that count the page visits and events that matter." },
   { title: "Teams", text: "Realtime on a shared screen, journeys to settle arguments about where people actually go, and public share links for anyone who needs a look without an account." },
 ];
 

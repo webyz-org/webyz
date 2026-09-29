@@ -156,3 +156,12 @@ describe("outbound link filters", () => {
     assert.equal(buildOutboundRowFilters({ browser: { op: "is", value: "Chrome" } }, {}), "");
   });
 });
+
+describe("channel filter", () => {
+  it("carries the columns that regroup old sessions as AI Assistants", () => {
+    const built = buildSessionFilters({ channel: { op: "is", value: "AI Assistants" } }, {});
+    for (const column of ["channel", "referrer_domain", "utm_source"]) {
+      assert.ok(built.columns.includes(column), column);
+    }
+  });
+});

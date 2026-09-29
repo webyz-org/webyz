@@ -47,6 +47,23 @@ export const sortItems = (items: readonly ChangeItem[]): ChangeItem[] =>
 
 export const RELEASES: Release[] = [
   {
+    slug: "ai-assistants-channel",
+    date: "2026-09-29",
+    title: "Traffic from AI assistants",
+    summary:
+      "Visits from ChatGPT, Perplexity, Claude, Gemini and other assistants used to hide inside Referral. They now have a channel of their own.",
+    items: [
+      {
+        kind: "new",
+        text: "An AI Assistants channel in the Channels tab. A visit counts when it arrives from an assistant's site, or from a link the assistant tagged itself (ChatGPT adds utm_source=chatgpt.com, which also catches clicks from its apps, where no referrer is sent). A paid campaign tag still wins over the assistant.",
+      },
+      {
+        kind: "new",
+        text: "It covers your history too: visits recorded before today are regrouped when the dashboard reads them, so you can compare this month's AI traffic with last quarter's straight away. Click the row to filter the whole dashboard to those visits, open Sources to see which assistant sent them, or save it as a segment.",
+      },
+    ],
+  },
+  {
     slug: "outbound-links",
     date: "2026-09-25",
     title: "Where visitors leave to",

@@ -6,6 +6,7 @@ All notable changes to Webyz are recorded here. The format follows [Keep a Chang
 
 ### Added
 
+- AI Assistants channel: visits from ChatGPT, Perplexity, Claude, Gemini, Copilot and other assistants (`ingest/helpers/ai-assistants.ts`), matched on the referrer host or on the `utm_source` an assistant appends (ChatGPT's `utm_source=chatgpt.com`), are their own channel instead of Referral or Other Campaign. A paid or declared medium still wins. Sessions recorded before this are regrouped when read, so the channel covers history, and `f.channel=AI Assistants` filters to it. The live visitor list shows the stored channel, so a session already running before the upgrade still reads Referral there.
 - A custom event now counts as engagement with the visit, as in Plausible and Umami: it ends the bounce and extends the visit duration. Bounce rate everywhere is "one pageview and no custom event" (sessions carry `events`, so rows from before are unchanged).
 - Session writes are serialised per session (a short Redis lock), so a route change's engagement report and next pageview can no longer overwrite each other's update to the session row.
 - Engagement tracking: the script reports how long a page was visible and how far it was scrolled when the tab is hidden, loses focus or is left. Visit duration now runs to the last engagement report, so single-page visits are no longer 0 s (`sessions.engaged_seconds`, `sessions.scroll_depth`, new `engagements` table; ClickHouse migrations 010 and 011). Engagement reports are not billed.

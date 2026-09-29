@@ -3,6 +3,7 @@ import { ClickHouseClient } from "@clickhouse/client";
 import { Pagination } from "../../core/types/pagination.js";
 import {
   AnalyticsFilters,
+  CHANNEL_SPEC,
   buildSessionFilters,
   type FilterOperator,
 } from "./filters.js";
@@ -88,10 +89,7 @@ const DIMENSIONS: Record<SessionDimension, DimensionSpec> = {
   language: { columns: ["language"], expr: "language", excludeEmpty: true },
   entry_page: { columns: ["entry_page"], expr: "entry_page" },
   exit_page: { columns: ["exit_page"], expr: "exit_page" },
-  channel: {
-    columns: ["channel"],
-    expr: "if(channel = '', 'Direct', channel)",
-  },
+  channel: CHANNEL_SPEC,
   source: {
     columns: ["referrer_domain"],
     expr: "if(referrer_domain = '', '(direct)', referrer_domain)",

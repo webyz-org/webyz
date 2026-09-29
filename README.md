@@ -35,7 +35,7 @@ Most sites need one page of numbers: how many people came, from where, what they
 ## Features
 
 - **Overview** of visitors, visits, pageviews, views per visit, bounce rate and visit duration, each compared with the previous period, with a graph at minute, hour, day, week or month resolution.
-- **Breakdowns** by page, entry and exit page, channel, source, UTM parameters, browser, OS, device, screen size, language, country, region and city. Click a row to drill down (browser to versions, country to regions to cities); every filter lives in the URL so a view is a link.
+- **Breakdowns** by page, entry and exit page, channel (AI assistants such as ChatGPT and Perplexity are a channel of their own), source, UTM parameters, browser, OS, device, screen size, language, country, region and city. Click a row to drill down (browser to versions, country to regions to cities); every filter lives in the URL so a view is a link.
 - **Filters** with `is`, `is not`, `contains` and `does not contain`, on any dimension plus goals and custom events. Save a set as a **segment** and apply it in one click.
 - **Realtime**: who is on the site right now on a world map, what they are looking at, and a live stream of activity.
 - **Goals, funnels and custom events** from event names or page paths, analysed live in ClickHouse. Custom event **properties** are broken down per value, so "Signup by plan" is two clicks.

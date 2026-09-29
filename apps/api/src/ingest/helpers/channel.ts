@@ -4,6 +4,8 @@
  * dashboard queries never have to re-derive it.
  */
 
+import { AI_ASSISTANT_CHANNEL, isAiAssistant } from "./ai-assistants.js";
+
 const SEARCH_ENGINES = new Set([
   "google",
   "bing",
@@ -112,13 +114,17 @@ export const classifyChannel = ({
 
   if (ORGANIC_SOCIAL_MEDIUMS.has(medium)) return "Organic Social";
 
-  // A utm_source naming a known network or engine, with a non-paid medium.
+  // A utm_source naming a known assistant, network or engine, with a
+  // non-paid medium. Assistants first: ChatGPT tags its own links.
   if (source) {
+    if (isAiAssistant(source)) return AI_ASSISTANT_CHANNEL;
     if (SOCIAL_NETWORKS.has(source) || isSocialNetwork(source))
       return "Organic Social";
     if (SEARCH_ENGINES.has(source) || isSearchEngine(source))
       return "Organic Search";
   }
+
+  if (referrer && isAiAssistant(referrer)) return AI_ASSISTANT_CHANNEL;
 
   if (REFERRAL_MEDIUMS.has(medium) && referrer) return "Referral";
 
