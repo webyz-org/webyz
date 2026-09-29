@@ -98,19 +98,39 @@ export default function AuthShell({
 const backCls =
   "flex items-center gap-1.5 rounded-md py-1 pr-2 text-[13.5px] font-medium text-text-secondary transition-colors duration-150 hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40";
 
+/**
+ * "Last used" pill pinned to the right edge of a sign-in option, so a returning
+ * user can see which way they signed in before. `onBrand` is for the blue
+ * submit button, where the soft brand fill would not read.
+ */
+function LastUsedBadge({ onBrand }: { onBrand?: boolean }) {
+  return (
+    <span
+      className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+        onBrand ? "bg-white/20 text-white" : "bg-primary-soft text-brand-ink"
+      }`}
+    >
+      Last used
+    </span>
+  );
+}
+
 /** The one submit button every auth screen uses: blue, full width, 40px. */
 export function AuthSubmit({
   pending,
   pendingLabel = "Please wait…",
+  lastUsed,
   children,
 }: {
   pending?: boolean;
   pendingLabel?: string;
+  lastUsed?: boolean;
   children: ReactNode;
 }) {
   return (
-    <Button type="submit" size="lg" className="mt-5 w-full" disabled={pending}>
+    <Button type="submit" size="lg" className="relative mt-5 w-full" disabled={pending}>
       {pending ? pendingLabel : children}
+      {lastUsed && !pending && <LastUsedBadge onBrand />}
     </Button>
   );
 }
@@ -132,7 +152,13 @@ function AuthDivider() {
  * configured, so an unconfigured server shows a plain email form instead of a
  * button that redirects to Google with an empty client id.
  */
-export function GoogleButton({ label = "Continue with Google" }: { label?: string }) {
+export function GoogleButton({
+  label = "Continue with Google",
+  lastUsed,
+}: {
+  label?: string;
+  lastUsed?: boolean;
+}) {
   const { google } = useAuthProviders();
   if (!google) return null;
 
@@ -141,10 +167,11 @@ export function GoogleButton({ label = "Continue with Google" }: { label?: strin
     <AuthDivider />
     <a
       href={GOOGLE_AUTH_URL}
-      className="flex h-10 w-full items-center justify-center gap-2.5 rounded-lg border border-border bg-surface text-sm font-medium text-text-primary transition-colors duration-150 hover:border-border-strong hover:bg-bg/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+      className="relative flex h-10 w-full items-center justify-center gap-2.5 rounded-lg border border-border bg-surface text-sm font-medium text-text-primary transition-colors duration-150 hover:border-border-strong hover:bg-bg/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
     >
       <img src="/google.svg" alt="" width={18} height={18} />
       {label}
+      {lastUsed && <LastUsedBadge />}
     </a>
     </>
   );

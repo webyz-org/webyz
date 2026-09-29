@@ -13,6 +13,7 @@ import {
   resetPasswordApi,
   signupApi,
 } from "../api";
+import { rememberSignInMethod } from "../lastMethod";
 
 export const meKey = ["me"];
 
@@ -23,7 +24,10 @@ export const useSignup = () => {
     // A signup that needs email confirmation has no session yet; only seed the
     // cache when the API actually signed the user in.
     onSuccess: (data) => {
-      if (!data.requiresVerification) qc.setQueryData(meKey, { user: data.user });
+      if (!data.requiresVerification) {
+        qc.setQueryData(meKey, { user: data.user });
+        rememberSignInMethod("password");
+      }
     },
   });
 };
@@ -32,7 +36,10 @@ export const useLogin = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: loginApi,
-    onSuccess: (data) => qc.setQueryData(meKey, data),
+    onSuccess: (data) => {
+      qc.setQueryData(meKey, data);
+      rememberSignInMethod("password");
+    },
   });
 };
 
@@ -128,7 +135,11 @@ export const useVerifyEmail = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: verifyEmailApi,
-    onSuccess: (data) => qc.setQueryData(meKey, data),
+    // Only password signups need verifying, and redeeming the link signs in.
+    onSuccess: (data) => {
+      qc.setQueryData(meKey, data);
+      rememberSignInMethod("password");
+    },
   });
 };
 

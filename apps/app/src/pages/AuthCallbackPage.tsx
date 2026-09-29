@@ -3,6 +3,7 @@ import { Navigate, useSearchParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { meKey } from "../features/auth/hooks/useAuth";
+import { rememberSignInMethod } from "../features/auth/lastMethod";
 
 /**
  * Where the API sends the browser after Google OAuth. On success the session
@@ -14,6 +15,7 @@ export function AuthSuccessPage() {
 
   useEffect(() => {
     qc.removeQueries({ queryKey: meKey });
+    rememberSignInMethod("google");
   }, [qc]);
 
   return <Navigate to="/sites" replace />;

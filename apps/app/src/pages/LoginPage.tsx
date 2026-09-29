@@ -22,6 +22,7 @@ import AuthShell, {
 } from "../features/auth/components/AuthShell";
 import { legalNotice } from "../features/auth/components/legalNotice";
 import { useAuthProviders, useResendVerification } from "../features/auth/hooks/useAuth";
+import { readLastSignInMethod } from "../features/auth/lastMethod";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -40,7 +41,12 @@ export default function LoginPage() {
   const [formError, setFormError] = useState<string | null>(
     (location.state as { error?: string } | null)?.error ?? null,
   );
-  const { registration } = useAuthProviders();
+  const { registration, google } = useAuthProviders();
+  // Read once: this page's own sign-in overwrites it, and the badge should not
+  // jump between buttons while the user is signing in.
+  const [lastMethod] = useState(readLastSignInMethod);
+  // With only one way in there is nothing to choose between, so no badge.
+  const showLastUsed = google && lastMethod !== null;
   const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
   const resend = useResendVerification();
 
@@ -173,13 +179,17 @@ export default function LoginPage() {
             </p>
           )}
 
-          <AuthSubmit pending={isPending} pendingLabel="Signing in…">
+          <AuthSubmit
+            pending={isPending}
+            pendingLabel="Signing in…"
+            lastUsed={showLastUsed && lastMethod === "password"}
+          >
             Sign in
           </AuthSubmit>
         </form>
       </Form>
 
-      <GoogleButton />
+      <GoogleButton lastUsed={showLastUsed && lastMethod === "google"} />
     </AuthShell>
   );
 }
