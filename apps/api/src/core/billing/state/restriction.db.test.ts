@@ -306,3 +306,18 @@ test("free quota block lifts when a trial starts, and the trial's allowance is i
   assert.equal(s.restriction, "NONE");
   assert.equal(await prisma.website.count({ where: { userId: free.user.id, isBlocked: true } }), 0, "fresh allowance: sites back on");
 });
+
+test("a comped local-only paid plan over its allowance stays on and is not emailed; removing the comp blocks it", { skip }, async () => {
+  const { sub, user } = await seed("comped", { total: OVER_CAP, paid: false });
+  await prisma.subscription.update({ where: { id: sub.id }, data: { compedAt: now, compNote: "test" } });
+
+  await enforce(sub.id);
+  assert.equal((await state(sub.id, user.id)).restriction, "NONE");
+  assert.equal(await prisma.billingNotification.count({ where: { subscriptionId: sub.id } }), 0);
+
+  await prisma.subscription.update({ where: { id: sub.id }, data: { compedAt: null } });
+  await reconcileRestriction(ctx, user.id);
+  const s = await state(sub.id, user.id);
+  assert.equal(s.restriction, "FREE_QUOTA");
+  assert.equal(s.blocked, true);
+});

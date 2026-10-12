@@ -66,6 +66,7 @@ export const reconcileRestriction = async (ctx: Deps, userId: string, now: Date 
             isPayg,
             capReached: isPayg && period !== null && usageWithCap(sub.plan, sub, { totalEvents: total, includedEvents: included }).capReached,
             quotaReached: !isPayg && period !== null && isQuotaReached(total, included),
+            comped: sub.compedAt !== null,
           };
         })()
       : null;

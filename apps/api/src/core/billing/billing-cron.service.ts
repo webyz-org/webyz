@@ -160,7 +160,10 @@ async function checkPeriod(period: any): Promise<{
   const isPayg = plan.overagePricePer1k !== null && subscription.providerSubscriptionId !== null;
 
   let warned = false;
-  if (isPayg) {
+  if (subscription.compedAt) {
+    // An operator-granted plan: no allowance is enforced and nothing is
+    // billed, so there is nothing to warn about.
+  } else if (isPayg) {
     warned = await sendWarningsIfNeeded(period, subscription, usageRatio);
     await sendSpendCapEmails(period, subscription);
   } else if (usageRatio >= 1.0) {

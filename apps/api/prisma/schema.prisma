@@ -301,6 +301,13 @@ model Subscription {
   pendingBillingCycle BillingCycle? @map("pending_billing_cycle")
   pendingChangeAt     DateTime?     @map("pending_change_at") @db.Timestamptz(6)
 
+  // Operator comp: a local-only paid plan given without payment. Set, the
+  // plan's monthly allowance is not enforced (no FREE_QUOTA block, no
+  // over-quota emails) and nothing is charged, since there is no provider
+  // subscription to charge. Only `scripts/billing/comp-plan.ts` writes it.
+  compedAt DateTime? @map("comped_at") @db.Timestamptz(6)
+  compNote String?   @map("comp_note")
+
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 

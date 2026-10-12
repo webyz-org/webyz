@@ -133,6 +133,15 @@ test("a trial is a hard-limit plan: its allowance blocks like Free", () => {
   assert.equal(decideRestriction(hardLimit({ status: "TRIALING" }), NOW).restriction, "NONE");
 });
 
+test("a comped plan has no allowance to enforce; non-payment would still outrank it", () => {
+  assert.equal(decideRestriction(hardLimit({ comped: true, quotaReached: true }), NOW).restriction, "NONE");
+  assert.equal(decideRestriction(hardLimit({ comped: true, quotaReached: true }), NOW).reasons.quotaReached, false);
+  assert.equal(
+    decideRestriction(hardLimit({ comped: true, quotaReached: true, status: "UNPAID" }), NOW).restriction,
+    "PAYMENT_FAILED",
+  );
+});
+
 test("quota arithmetic: reached at the allowance, a zero allowance blocks on the first event", () => {
   assert.equal(isQuotaReached(9_999, 10_000), false);
   assert.equal(isQuotaReached(10_000, 10_000), true);

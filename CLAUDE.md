@@ -144,7 +144,12 @@ it, and which events the destination carries. Neither prints a secret.
 
 `npx tsx scripts/billing/reconcile.ts` (in `apps/api`) is the read-only
 reconciliation of ledger, charging checkpoint, charge transaction and invoice
-line for closed periods; it exits non-zero on any finding. The billing page (`apps/app` BillingPage) renders
+line for closed periods; it exits non-zero on any finding.
+`scripts/billing/comp-plan.ts --email <e> --note "<why>"` (or `--off`) marks a
+live, local-only paid subscription as comped (`subscriptions.comped_at`): a
+paid plan with no provider behind it is otherwise a hard limit like a trial,
+so a plan given away would be paused at its allowance. Comped means no quota
+block, no usage emails, nothing billed. The billing page (`apps/app` BillingPage) renders
 only from `GET /billing/usage`, `/plans` and `/billing/invoices`; it computes
 nothing itself.
 

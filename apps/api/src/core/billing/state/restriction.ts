@@ -25,6 +25,8 @@
  *  3. FREE_QUOTA      hard-limit plan (free or trial) and the period's events
  *                     have reached the allowance. Lifted by the next period or
  *                     by moving to a plan with room, never while (1) or (2) hold.
+ *                     A comped subscription (an operator-granted plan with no
+ *                     provider behind it) has no allowance to enforce.
  *  4. NONE            ingest on.
  *
  * PAST_DUE inside its grace window is not a restriction: dashboards and ingest
@@ -45,6 +47,8 @@ export type RestrictionFacts = {
   capReached: boolean;
   /** The current period's events have reached a hard-limit plan's allowance. */
   quotaReached: boolean;
+  /** Operator comp: the plan was given, so its allowance is not enforced. */
+  comped?: boolean;
 };
 
 export type RestrictionDecision = {
@@ -60,7 +64,7 @@ export const decideRestriction = (facts: RestrictionFacts, now: Date = new Date(
     facts.status === "UNPAID" ||
     (facts.status === "PAST_DUE" && facts.graceEndsAt !== null && facts.graceEndsAt.getTime() <= now.getTime());
   const capReached = facts.isPayg && facts.capReached;
-  const quotaReached = !facts.isPayg && facts.quotaReached;
+  const quotaReached = !facts.isPayg && !facts.comped && facts.quotaReached;
 
   const restriction: RestrictionKind = paymentFailed
     ? "PAYMENT_FAILED"
