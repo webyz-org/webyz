@@ -47,6 +47,23 @@ export const sortItems = (items: readonly ChangeItem[]): ChangeItem[] =>
 
 export const RELEASES: Release[] = [
   {
+    slug: "more-events-on-every-plan",
+    date: "2026-10-29",
+    title: "More events on every plan",
+    summary:
+      "Every plan now includes more events a month, at the same price. Overage pricing has not changed.",
+    items: [
+      {
+        kind: "improved",
+        text: "Free includes 20,000 events a month, up from 10,000. A site paused under the old limit resumes within the hour.",
+      },
+      {
+        kind: "improved",
+        text: "Starter includes 250,000 events (was 100,000), Growth 1,000,000 (was 500,000) and Business 5,000,000 (was 2,000,000). The current billing period counts against the new allowance.",
+      },
+    ],
+  },
+  {
     slug: "import-your-history",
     date: "2026-10-29",
     title: "Bring your history with you",

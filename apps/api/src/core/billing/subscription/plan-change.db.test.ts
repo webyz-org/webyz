@@ -104,7 +104,7 @@ test("preview: downgrade lists lost limits and features, sites that would go ina
   const keptIds = new Set(siteIds.slice(0, 3));
   assert.ok(p.sites.wouldGoInactive.every((s) => !keptIds.has(s.id)));
   assert.ok(p.diff.featuresLost.some((f) => f.key === "journeys"));
-  assert.ok(p.diff.limits.some((l) => l.key === "events_per_period" && l.from === 500_000 && l.to === 100_000));
+  assert.ok(p.diff.limits.some((l) => l.key === "events_per_period" && l.from === 1_000_000 && l.to === 250_000));
   assert.ok(p.notes.some((n) => n.includes("current period ends")));
   assert.ok(p.notes.some((n) => n.includes("stop collecting new data")));
 

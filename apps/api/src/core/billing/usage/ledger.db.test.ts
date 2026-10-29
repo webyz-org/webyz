@@ -112,7 +112,7 @@ test("ensureOpenPeriod creates the current period once and refreshes included ev
   const b = await ensureOpenPeriod(deps, sub, iso("2026-09-06T13:00:00Z"));
   assert.equal(a.id, b.id);
   assert.equal(a.status, "OPEN");
-  assert.equal(Number(a.includedEvents), 500_000);
+  assert.equal(Number(a.includedEvents), 1_000_000);
 
   const count = await prisma.billingPeriodUsage.count({ where: { subscriptionId: subId } });
   assert.equal(count, 1);
@@ -173,7 +173,7 @@ test("once the live hour closes it becomes a bucket and the live count moves on"
 
 test("overage is total minus included, floored at zero, and stored on the period", { skip }, async () => {
   const sub = await loadSub();
-  const rows: HourRow[] = [{ hour: iso("2026-09-05T10:00:00Z"), count: 500_250 }];
+  const rows: HourRow[] = [{ hour: iso("2026-09-05T10:00:00Z"), count: 1_000_250 }];
   const deps = { prisma, clickhouse: scriptedClickhouse(() => rows) };
   const period = await ensureOpenPeriod(deps, sub, iso("2026-09-06T13:05:00Z"));
   const r = await aggregatePeriod(deps, sub, period, iso("2026-09-06T13:05:00Z"));

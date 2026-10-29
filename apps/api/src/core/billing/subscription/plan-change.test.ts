@@ -24,7 +24,7 @@ test("entitlement diff lists changed limits and gained or lost features with lab
     down.limits.map((l) => [l.key, l.from, l.to]),
     [
       ["sites", 10, 1],
-      ["events_per_period", 500_000, 10_000],
+      ["events_per_period", 1_000_000, 20_000],
       ["retention_days", 730, 90],
       ["team_members", 5, 1],
     ],

@@ -105,7 +105,7 @@ test("new account starts a Growth trial with a single usage period covering the 
   assert.equal(summary.access.state, "TRIAL");
   assert.equal(summary.trial?.daysRemaining, BILLING_CONFIG.trial.days - 2);
   assert.equal(summary.trial?.fallbackPlanName, "Free");
-  assert.equal(summary.usage.includedEvents, 500_000);
+  assert.equal(summary.usage.includedEvents, 1_000_000);
   // No subscription at the provider, so the only way onto a paid plan is
   // checkout. The billing page reads exactly this to decide.
   assert.equal(summary.subscription?.isProviderBacked, false);
@@ -127,8 +127,8 @@ test("a trial that used up its allowance still reports itself as a trial to buy 
       subscriptionId: trial.id,
       periodStart: trial.currentPeriodStart!,
       periodEnd: trial.currentPeriodEnd!,
-      includedEvents: BigInt(500_000),
-      totalEvents: BigInt(500_344),
+      includedEvents: BigInt(1_000_000),
+      totalEvents: BigInt(1_000_344),
       overageEvents: BigInt(344),
       status: "OPEN",
     },

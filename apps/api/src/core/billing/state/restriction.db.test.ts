@@ -41,8 +41,8 @@ const noRedis = { get: async () => null, setex: async () => "OK", del: async () 
 let ctx: AppContext;
 
 /** Growth: 500k included, 1900c base, 2c per 1k overage, default cap 2x base = 3800c. */
-const OVER_CAP = 500_000 + 1_000_000; // 1000 units x 2c = 2000c overage -> 3900c >= 3800c
-const UNDER_CAP = 500_000 + 100_000; // 200c overage -> 2100c
+const OVER_CAP = 1_000_000 + 1_000_000; // 1000 units x 2c = 2000c overage -> 3900c >= 3800c
+const UNDER_CAP = 1_000_000 + 100_000; // 200c overage -> 2100c
 const HUGE_CAP = 1_000_000;
 
 const seed = async (label: string, opts: { total: number; planCode?: "growth" | "free"; paid?: boolean; status?: "ACTIVE" | "TRIALING" }) => {

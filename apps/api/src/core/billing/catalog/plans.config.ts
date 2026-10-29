@@ -34,7 +34,7 @@ export const PLAN_CATALOG: readonly PlanDefinition[] = [
     isPublic: true,
     entitlements: {
       sites: 1,
-      events_per_period: 10_000,
+      events_per_period: 20_000,
       retention_days: 90,
       team_members: 1,
       realtime: true,
@@ -57,7 +57,7 @@ export const PLAN_CATALOG: readonly PlanDefinition[] = [
     isPublic: true,
     entitlements: {
       sites: 3,
-      events_per_period: 100_000,
+      events_per_period: 250_000,
       retention_days: 365,
       team_members: 1,
       realtime: true,
@@ -80,7 +80,7 @@ export const PLAN_CATALOG: readonly PlanDefinition[] = [
     isPublic: true,
     entitlements: {
       sites: 10,
-      events_per_period: 500_000,
+      events_per_period: 1_000_000,
       retention_days: 730,
       team_members: 5,
       realtime: true,
@@ -103,7 +103,7 @@ export const PLAN_CATALOG: readonly PlanDefinition[] = [
     isPublic: true,
     entitlements: {
       sites: 25,
-      events_per_period: 2_000_000,
+      events_per_period: 5_000_000,
       retention_days: 1_095,
       team_members: 15,
       realtime: true,

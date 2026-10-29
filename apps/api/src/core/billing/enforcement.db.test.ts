@@ -71,9 +71,9 @@ after(async () => {
 });
 
 test("a trial at 100% of the trial plan's allowance is a hard stop: restricted and blocked, no billing", { skip }, async () => {
-  const trial = await seed("trial", { status: "TRIALING", planCode: "growth", paid: false, total: 500_000 });
-  const paid = await seed("paid", { status: "ACTIVE", planCode: "growth", paid: true, total: 500_000 });
-  const free = await seed("free", { status: "ACTIVE", planCode: "free", paid: false, total: 9_000 });
+  const trial = await seed("trial", { status: "TRIALING", planCode: "growth", paid: false, total: 1_000_000 });
+  const paid = await seed("paid", { status: "ACTIVE", planCode: "growth", paid: true, total: 1_000_000 });
+  const free = await seed("free", { status: "ACTIVE", planCode: "free", paid: false, total: 18_000 });
 
   const scope = { subscriptionIds: [trial.sub.id, paid.sub.id, free.sub.id] };
   await enforceUsageLimits(scope);

@@ -102,7 +102,7 @@ test("setting the cap: bounds, plan eligibility, and the default", { skip }, asy
 
 test("enforcement: cap reached restricts ingest and emails once; raising the cap lifts it immediately", { skip }, async () => {
   // Growth: 1900 base, 2c/1k, default cap 3800 -> 950k overage events reach it.
-  const { user, sub, period } = await seed("reach", { total: 500_000 + 950_000 });
+  const { user, sub, period } = await seed("reach", { total: 1_000_000 + 950_000 });
   const scope = { subscriptionIds: [sub.id] };
 
   await enforceUsageLimits(scope);
@@ -130,20 +130,20 @@ test("enforcement: cap reached restricts ingest and emails once; raising the cap
 });
 
 test("approaching the cap emails once; overage below approaching sends nothing about the cap", { skip }, async () => {
-  const { sub } = await seed("approach", { total: 500_000 + 860_000 }); // 1900 + 1720 = 3620 >= 0.9 * 3800
+  const { sub } = await seed("approach", { total: 1_000_000 + 860_000 }); // 1900 + 1720 = 3620 >= 0.9 * 3800
   const scope = { subscriptionIds: [sub.id] };
   await enforceUsageLimits(scope);
   await enforceUsageLimits(scope);
   assert.deepEqual((await kinds(sub.id)).filter((k) => k.startsWith("spend_cap")), ["spend_cap_approaching"]);
   assert.equal((await subRow(sub.id)).restriction, "NONE");
 
-  const quiet = await seed("quiet", { total: 500_000 + 100_000 });
+  const quiet = await seed("quiet", { total: 1_000_000 + 100_000 });
   await enforceUsageLimits({ subscriptionIds: [quiet.sub.id] });
   assert.deepEqual((await kinds(quiet.sub.id)).filter((k) => k.startsWith("spend_cap")), []);
 });
 
 test("lowering the cap below what the period already cost defers it; the next period applies it", { skip }, async () => {
-  const { user, sub } = await seed("lower", { total: 500_000 + 500_000, cap: 6_000 }); // bill 1900 + 1000 = 2900
+  const { user, sub } = await seed("lower", { total: 1_000_000 + 500_000, cap: 6_000 }); // bill 1900 + 1000 = 2900
   const r = await setSpendCap(ctx, user.id, 2_500);
   assert.equal(r.effective, "next_period");
   assert.equal(r.alreadyExceeded, true);
@@ -185,8 +185,8 @@ test("lowering the cap below what the period already cost defers it; the next pe
 });
 
 test("annual: cap measured against the monthly-equivalent base, so the same overage is under the cap", { skip }, async () => {
-  const monthly = await seed("m", { total: 500_000 + 950_000 });
-  const yearly = await seed("y", { total: 500_000 + 950_000, cycle: "YEARLY" });
+  const monthly = await seed("m", { total: 1_000_000 + 950_000 });
+  const yearly = await seed("y", { total: 1_000_000 + 950_000, cycle: "YEARLY" });
   await enforceUsageLimits({ subscriptionIds: [monthly.sub.id, yearly.sub.id] });
   assert.equal((await subRow(monthly.sub.id)).restriction, "SPEND_CAP", "1900 + 1900 = 3800 reaches the cap");
   assert.equal((await subRow(yearly.sub.id)).restriction, "NONE", "1583 + 1900 = 3483 stays under");
