@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -7,6 +8,10 @@ import WhoAccordion from "../components/marketing/WhoAccordion";
 import { BendArrow, CurlArrow, HookArrow, SmallArrow, Sparkle, Squiggle, Sticker } from "../components/marketing/Doodles";
 import { ButtonLink, Ico, ProductFrame } from "../components/marketing/ui";
 import { GITHUB_URL, SIGNUP_URL } from "../config/site";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 /** Handwritten label with a small arrow, the reference's section opener. */
 function Hand({ children, className = "" }: { children: React.ReactNode; className?: string }) {

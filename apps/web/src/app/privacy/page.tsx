@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "Privacy policy - Webyz",
   description:
     "What Webyz collects about account holders and about visitors of the websites it measures, how long it is kept, and how to exercise your rights.",
+  alternates: { canonical: "/privacy" },
 };
 
 const li = "list-disc space-y-1.5 pl-5";

@@ -7,6 +7,7 @@ import { LEGAL } from "../../lib/legal";
 export const metadata: Metadata = {
   title: "Refund and cancellation policy - Webyz",
   description: "How cancelling works, what happens to your data, and when a payment is refunded.",
+  alternates: { canonical: "/refunds" },
 };
 
 const li = "list-disc space-y-1.5 pl-5";

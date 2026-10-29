@@ -19,7 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const guide = findGuide(slug);
   return guide
-    ? { title: `${guide.title} - Webyz docs`, description: guide.blurb }
+    ? { title: `${guide.title} - Webyz docs`, description: guide.blurb, alternates: { canonical: `/docs/${slug}` } }
     : { title: "Documentation - Webyz" };
 }
 

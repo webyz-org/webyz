@@ -7,6 +7,7 @@ import { LEGAL, operatorLine } from "../../lib/legal";
 export const metadata: Metadata = {
   title: "Terms of service - Webyz",
   description: "The agreement between Webyz and the people who create accounts and install it on their websites.",
+  alternates: { canonical: "/terms" },
 };
 
 const li = "list-disc space-y-1.5 pl-5";

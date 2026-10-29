@@ -10,6 +10,7 @@ import { GUIDES } from "../../lib/docs";
 export const metadata: Metadata = {
   title: "Documentation - Webyz",
   description: "Self-hosting, configuration, the tracker script, the HTTP API, development and architecture guides for Webyz.",
+  alternates: { canonical: "/docs" },
 };
 
 export default function DocsIndexPage() {

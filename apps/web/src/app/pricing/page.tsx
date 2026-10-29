@@ -11,6 +11,7 @@ import { FAQ } from "../../lib/faq";
 export const metadata: Metadata = {
   title: "Pricing - Webyz",
   description: "Simple event based pricing. Start free and move up only when you outgrow it.",
+  alternates: { canonical: "/pricing" },
 };
 
 export default async function PricingPage() {

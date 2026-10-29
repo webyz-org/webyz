@@ -12,6 +12,7 @@ All notable changes to Webyz are recorded here. The format follows [Keep a Chang
 
 ### Fixed
 
+- Marketing site: every page declared the homepage as its canonical URL (inherited from the root layout), so Google indexed only the homepage and treated pricing, docs and the legal pages as duplicates of it. Each page now declares its own canonical; the blog and changelog already did.
 - Channels: a referrer was matched against the social network and search engine lists by its first label only, so Facebook's and Instagram's link redirects (`lm.facebook.com`, `l.instagram.com`), `m.facebook.com`, `out.reddit.com` and `images.google.com` were filed as Referral. Hosts are now matched by every parent domain and by the registrable domain's name (`google.co.in` is Google), never by a label of someone else's subdomain (`x.example.com` stays Referral). Applies to visits from now on and to imports; sessions already stored keep their channel. Found by importing a real Plausible export.
 - CSV import: Plausible lists its own `engagement` (and older `pageleave`) events among custom events in its export; they are no longer imported as custom events.
 - The note under the overview named Google Analytics for any imported data; it now says imported history whatever the source.

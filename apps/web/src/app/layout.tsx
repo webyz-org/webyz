@@ -37,7 +37,9 @@ export const metadata: Metadata = {
     template: "%s",
   },
   description,
-  alternates: { canonical: "/" },
+  // No site-wide canonical: every page declares its own. A canonical here
+  // is inherited by pages that set none, which told Google that pricing, docs
+  // and the legal pages were copies of the homepage; only the homepage indexed.
   openGraph: {
     type: "website",
     siteName: "Webyz",
