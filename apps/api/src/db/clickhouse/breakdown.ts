@@ -3,22 +3,72 @@ import { ClickHouseClient } from "@clickhouse/client";
 import { Pagination } from "../../core/types/pagination.js";
 import {
   AnalyticsFilters,
+  BROWSER_VERSION_SPEC,
   CHANNEL_SPEC,
+  OS_VERSION_SPEC,
+  SEARCH_TERM_EXPR,
+  buildEventsSessionRestriction,
   buildSessionFilters,
   type FilterOperator,
 } from "./filters.js";
+import { importedGroupSql, importedVisitorsSql, importedWhere, type ImportedRead } from "./imported.js";
 
-/** Direct url_path match for the pages dimension, one clause per operator. */
-const pagePredicate = (op: FilterOperator): string => {
+/**
+ * The tail of a breakdown with imported rows merged in: tracked rows grouped
+ * into raw parts (`native`), the planned imported rows grouped the same way
+ * (`imported`, core/imports/imported-plan.ts: the right family, the request's
+ * filters applied), added per label, then rates recomputed from the sums.
+ * Bounce rate and duration divide by `rate_visits`, the visits that carry
+ * bounces and seconds (tracked visits, and imported ones outside page and
+ * event rows). `nativeTotalVisitors` is the tracked visitor total over the
+ * filtered rows.
+ */
+const mergedTail = (input: {
+  nativeRows: string;
+  nativeTotalVisitors: string;
+  read: ImportedRead;
+  column: string;
+  query_params: Record<string, unknown>;
+}) => `,
+    native AS (${input.nativeRows}),
+    imported AS (${importedGroupSql(input.read, input.column, input.query_params)}),
+    merged AS (
+      SELECT
+        name,
+        sum(visitors) AS visitors,
+        sum(visits) AS visits,
+        sum(pageviews) AS pageviews,
+        sum(bounces) AS bounces,
+        sum(duration) AS duration,
+        sum(rate_visits) AS rate_visits
+      FROM (SELECT * FROM native UNION ALL SELECT * FROM imported)
+      GROUP BY name
+    )
+    SELECT
+      name,
+      toUInt32(visitors) AS visitors,
+      toUInt32(visits) AS visits,
+      toUInt32(pageviews) AS pageviews,
+      round(bounces / greatest(rate_visits, 1) * 100, 2) AS bounce_rate,
+      toUInt32(round(duration / greatest(rate_visits, 1))) AS visit_duration,
+      toUInt32(${input.nativeTotalVisitors} + ${importedVisitorsSql(input.read, input.query_params)}) AS total_visitors,
+      toUInt32((SELECT count() FROM merged)) AS dimension_count
+    FROM merged
+    ORDER BY visitors DESC, name ASC
+    LIMIT {limit:UInt32} OFFSET {offset:UInt32}
+  `;
+
+/** Direct match on the grouped pageview column, one clause per operator. */
+const pagePredicate = (op: FilterOperator, column: string, param: string): string => {
   switch (op) {
     case "is":
-      return "url_path = {flt_page:String}";
+      return `${column} = {${param}:String}`;
     case "is_not":
-      return "url_path != {flt_page:String}";
+      return `${column} != {${param}:String}`;
     case "contains":
-      return "positionCaseInsensitive(url_path, {flt_page:String}) > 0";
+      return `positionCaseInsensitive(${column}, {${param}:String}) > 0`;
     case "not_contains":
-      return "positionCaseInsensitive(url_path, {flt_page:String}) = 0";
+      return `positionCaseInsensitive(${column}, {${param}:String}) = 0`;
   }
 };
 
@@ -58,7 +108,8 @@ export type SessionDimension =
   | "utm_term"
   | "country"
   | "region"
-  | "city";
+  | "city"
+  | "hostname";
 
 type DimensionSpec = {
   /** Columns that must survive deduplication for this dimension. */
@@ -71,15 +122,10 @@ type DimensionSpec = {
 
 const DIMENSIONS: Record<SessionDimension, DimensionSpec> = {
   browser: { columns: ["browser_family"], expr: "browser_family" },
-  browser_version: {
-    columns: ["browser_family", "browser_version"],
-    expr: "concat(browser_family, ' ', browser_version)",
-  },
+  // major.minor, the rule every source's versions share (utils/version.ts).
+  browser_version: BROWSER_VERSION_SPEC,
   os: { columns: ["os_family"], expr: "os_family" },
-  os_version: {
-    columns: ["os_family", "os_version"],
-    expr: "concat(os_family, ' ', os_version)",
-  },
+  os_version: OS_VERSION_SPEC,
   // initcap over lower() so "desktop" and "Desktop" are one row.
   device: { columns: ["device_type"], expr: "initcap(lower(device_type))" },
   // Collected since the first release, surfaced since the sessions table
@@ -122,6 +168,8 @@ const DIMENSIONS: Record<SessionDimension, DimensionSpec> = {
     excludeEmpty: true,
   },
   city: { columns: ["city"], expr: "city", excludeEmpty: true },
+  // The host the visit started on, for sites served from several subdomains.
+  hostname: { columns: ["hostname"], expr: "hostname", excludeEmpty: true },
 };
 
 /** Kept as an alias: filters are shared with every other dashboard query. */
@@ -157,6 +205,8 @@ export type BreakdownInput = {
    * fields is set; combining with pagePath is not supported.
    */
   conversion?: { eventName?: string | null; pagePath?: string | null };
+  /** Planned imported read; ignored with a page or conversion restriction. */
+  imported?: ImportedRead | null;
 };
 
 export const sessionBreakdown = async (
@@ -223,6 +273,8 @@ export const sessionBreakdown = async (
     ? `WHERE ${havingClauses.join(" AND ")}`
     : "";
 
+  const merging = Boolean(input.imported && !input.pagePath && !input.conversion);
+
   const query = `
     WITH deduped AS (
       SELECT
@@ -244,7 +296,23 @@ export const sessionBreakdown = async (
     filtered AS (
       SELECT * FROM deduped
       ${whereDeduped}
-    )
+    )${merging ? mergedTail({
+      nativeRows: `
+      SELECT
+        ${spec.expr} AS name,
+        toUInt64(uniqExact(user_id)) AS visitors,
+        toUInt64(count()) AS visits,
+        toUInt64(sum(page_views)) AS pageviews,
+        toUInt64(countIf(events = 1)) AS bounces,
+        toUInt64(sum(duration_seconds)) AS duration,
+        toUInt64(count()) AS rate_visits
+      FROM filtered
+      GROUP BY name`,
+      nativeTotalVisitors: "(SELECT uniqExact(user_id) FROM filtered)",
+      read: input.imported!,
+      column: input.dimension,
+      query_params,
+    }) : `
     SELECT
       ${spec.expr} AS name,
       toUInt32(uniqExact(user_id)) AS visitors,
@@ -258,7 +326,7 @@ export const sessionBreakdown = async (
     GROUP BY name
     ORDER BY visitors DESC, name ASC
     LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-  `;
+  `}`;
 
   const result = await clickhouse.query({
     query,
@@ -292,8 +360,16 @@ export const pageBreakdown = async (
     to: number;
     pagination: Pagination;
     filters?: AnalyticsFilters;
+    imported?: ImportedRead | null;
+    /** Group by path (the Pages list, default) or by page title. */
+    column?: "url_path" | "page_title";
   },
 ): Promise<PageBreakdownRow[]> => {
+  const column = input.column ?? "url_path";
+  const filterKey = column === "url_path" ? "page" : "title";
+  // A bounce is a one-pageview session, so it entered on the page it saw;
+  // titles have no entry column to compare, and need none for that reason.
+  const bounceCondition = column === "url_path" ? "s.events = 1 AND s.entry_page = p.url_path" : "s.events = 1";
   const query_params: Record<string, unknown> = {
     websiteId: input.websiteId,
     from: input.from,
@@ -305,7 +381,7 @@ export const pageBreakdown = async (
   // Session filters keep only pageviews from matching sessions. The page
   // filter is special-cased to a direct path match: on the pages dimension it
   // means "this page", not "sessions that saw this page".
-  const { page, ...sessionFilters } = input.filters ?? {};
+  const { [filterKey]: page, ...sessionFilters } = input.filters ?? {};
   const built = buildSessionFilters(sessionFilters, query_params);
 
   const dedupColumns = built.columns
@@ -320,10 +396,10 @@ export const pageBreakdown = async (
     ? "AND session_id IN (SELECT session_id FROM sess)"
     : "";
 
-  let pageClause = "";
+  let pageClause = column === "page_title" ? "AND page_title != ''" : "";
   if (page) {
-    query_params.flt_page = page.value;
-    pageClause = `AND ${pagePredicate(page.op)}`;
+    query_params[`flt_${filterKey}`] = page.value;
+    pageClause += ` AND ${pagePredicate(page.op, column, `flt_${filterKey}`)}`;
   }
 
   const query = `
@@ -345,7 +421,7 @@ export const pageBreakdown = async (
       ${sessWhere}
     ),
     pageviews AS (
-      SELECT url_path, session_id, user_id
+      SELECT ${column} AS url_path, session_id, user_id
       FROM events
       WHERE website_id = {websiteId:String}
         AND event_type = 'pageview'
@@ -353,13 +429,32 @@ export const pageBreakdown = async (
         AND timestamp <  fromUnixTimestamp({to:UInt32})
         ${pageClause}
         ${sessionRestriction}
-    )
+    )${input.imported ? mergedTail({
+      // Per page: bounces are sessions that entered here and saw nothing
+      // else, duration the page's sessions' total, both over its sessions.
+      nativeRows: `
+      SELECT
+        p.url_path AS name,
+        toUInt64(uniqExact(p.user_id)) AS visitors,
+        toUInt64(uniqExact(p.session_id)) AS visits,
+        toUInt64(count()) AS pageviews,
+        toUInt64(countIf(${bounceCondition})) AS bounces,
+        toUInt64(round(ifNotFinite(avg(s.duration_seconds), 0) * uniqExact(p.session_id))) AS duration,
+        toUInt64(uniqExact(p.session_id)) AS rate_visits
+      FROM pageviews p
+      LEFT JOIN sess s USING (session_id)
+      GROUP BY name`,
+      nativeTotalVisitors: "(SELECT uniqExact(user_id) FROM pageviews)",
+      read: input.imported,
+      column: filterKey,
+      query_params,
+    }) : `
     SELECT
       p.url_path AS name,
       toUInt32(uniqExact(p.user_id)) AS visitors,
       toUInt32(count()) AS pageviews,
       round(
-        countIf(s.events = 1 AND s.entry_page = p.url_path)
+        countIf(${bounceCondition})
           / greatest(uniqExact(p.session_id), 1) * 100,
         2
       ) AS bounce_rate,
@@ -371,7 +466,7 @@ export const pageBreakdown = async (
     GROUP BY name
     ORDER BY visitors DESC, name ASC
     LIMIT {limit:UInt32} OFFSET {offset:UInt32}
-  `;
+  `}`;
 
   const result = await clickhouse.query({
     query,
@@ -380,4 +475,89 @@ export const pageBreakdown = async (
   });
 
   return result.json<PageBreakdownRow>();
+};
+
+/**
+ * Site search terms: pageviews whose URL carries a search parameter
+ * (SEARCH_TERM_EXPR), grouped by term. `pageviews` is the number of searches,
+ * so the row fits the breakdown shape; bounce and duration do not apply to a
+ * search and stay 0. Imported GA4 `view_search_results` counts merge in.
+ */
+export const searchTermBreakdown = async (
+  clickhouse: ClickHouseClient,
+  input: {
+    websiteId: string;
+    from: number;
+    to: number;
+    pagination: Pagination;
+    filters?: AnalyticsFilters;
+    imported?: ImportedRead | null;
+  },
+): Promise<BreakdownRow[]> => {
+  const { search_term: term, ...sessionFilters } = input.filters ?? {};
+  const query_params: Record<string, unknown> = {
+    websiteId: input.websiteId,
+    from: input.from,
+    to: input.to,
+    limit: input.pagination.limit,
+    offset: input.pagination.offset,
+  };
+  const restriction = buildEventsSessionRestriction(sessionFilters, query_params);
+  let termClause = "";
+  if (term) {
+    query_params.flt_search_term = term.value;
+    termClause = `AND ${pagePredicate(term.op, SEARCH_TERM_EXPR, "flt_search_term")}`;
+  }
+
+  let importedRows = "";
+  let importedTotal = "0";
+  if (input.imported) {
+    const where = importedWhere(input.imported, query_params);
+    importedRows = `
+          UNION ALL
+          SELECT search_term AS name, toUInt64(sum(visitors)), toUInt64(sum(events))
+          FROM webyz_analytics.imported_stats
+          WHERE ${where} AND search_term != ''
+          GROUP BY name`;
+    importedTotal = `(SELECT sum(visitors) FROM webyz_analytics.imported_stats WHERE ${where})`;
+  }
+
+  const result = await clickhouse.query({
+    query: `
+      WITH
+      searches AS (
+        SELECT ${SEARCH_TERM_EXPR} AS term, user_id
+        FROM events
+        WHERE website_id = {websiteId:String}
+          AND event_type = 'pageview'
+          AND timestamp >= fromUnixTimestamp({from:UInt32})
+          AND timestamp <  fromUnixTimestamp({to:UInt32})
+          AND ${SEARCH_TERM_EXPR} != ''
+          ${termClause}${restriction}
+      ),
+      merged AS (
+        SELECT name, sum(visitors) AS visitors, sum(searches) AS searches
+        FROM (
+          SELECT term AS name, toUInt64(uniqExact(user_id)) AS visitors, toUInt64(count()) AS searches
+          FROM searches GROUP BY name${importedRows}
+        )
+        GROUP BY name
+      )
+      SELECT
+        name,
+        toUInt32(visitors) AS visitors,
+        toUInt32(searches) AS visits,
+        toUInt32(searches) AS pageviews,
+        0 AS bounce_rate,
+        0 AS visit_duration,
+        toUInt32((SELECT uniqExact(user_id) FROM searches) + ${importedTotal}) AS total_visitors,
+        toUInt32((SELECT count() FROM merged)) AS dimension_count
+      FROM merged
+      ORDER BY visitors DESC, searches DESC, name ASC
+      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
+    `,
+    query_params,
+    format: "JSONEachRow",
+  });
+  return result.json<BreakdownRow>();
 };

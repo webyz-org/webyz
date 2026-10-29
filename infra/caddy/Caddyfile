@@ -8,6 +8,17 @@
 {$DOMAIN} {
 	encode zstd gzip
 
+	# CSV import uploads arrive as 240,000-character chunks, far above the
+	# tracker cap below. handle blocks match in order, so this one goes first
+	# and only the upload route gets the larger limit.
+	@imports path_regexp ^/api/v1/websites/[^/]+/imports/[^/]+/chunks$
+	handle @imports {
+		request_body {
+			max_size 2MB
+		}
+		reverse_proxy webyz-api:3042
+	}
+
 	@api path /api/* /js/* /health /health/*
 	handle @api {
 		# Tracker payloads are small; anything larger is not a pageview.

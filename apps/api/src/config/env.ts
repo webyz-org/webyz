@@ -1,3 +1,4 @@
+import path from "node:path";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -80,6 +81,25 @@ export const GSC_REDIRECT_URI =
 export const GSC_ENABLED = Boolean(
   GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GSC_REDIRECT_URI,
 );
+
+// Google Analytics 4 import. The same login OAuth client again with its own
+// callback (register it on the Google Cloud OAuth client too), plus the
+// Google Analytics Admin and Data APIs enabled in that project.
+export const GA4_IMPORT_REDIRECT_URI =
+  process.env.GA4_IMPORT_REDIRECT_URI ||
+  (GOOGLE_REDIRECT_URI
+    ? new URL("/api/v1/imports/ga4/callback", GOOGLE_REDIRECT_URI).toString()
+    : "");
+export const GA4_IMPORT_ENABLED = Boolean(
+  GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GA4_IMPORT_REDIRECT_URI,
+);
+
+/**
+ * Where prepared "Export data" zips are kept until they expire. A volume in
+ * the compose stacks (infra/docker-compose.yml `exports`), so a file survives
+ * a redeploy within its seven days.
+ */
+export const EXPORTS_DIR = process.env.EXPORTS_DIR || path.join(process.cwd(), "exports");
 
 /** 64 hex chars (32 bytes) for AES-256-GCM at rest; see core/gsc/token-crypto.ts. */
 export const ENCRYPTION_KEY = (process.env.ENCRYPTION_KEY ?? "").trim();

@@ -3,13 +3,18 @@ import {
   BreakdownFilters,
   SessionDimension,
   pageBreakdown,
+  searchTermBreakdown,
   sessionBreakdown,
 } from "../../db/clickhouse/breakdown.js";
 import { calculatePercentage } from "./helpers.js";
+import { readFor, type ImportedContext } from "../imports/imported-window.js";
+
+/** Session dimensions plus the three read from pageviews. */
+export type BreakdownDimension = SessionDimension | "page" | "title" | "search_term";
 
 export type BreakdownInput = {
   websiteId: string;
-  dimension: SessionDimension | "page";
+  dimension: BreakdownDimension;
   from: number;
   to: number;
   limit: number;
@@ -20,6 +25,8 @@ export type BreakdownInput = {
   pagePath?: string;
   /** Restrict to sessions that completed a goal (session dimensions only). */
   conversion?: { eventName?: string | null; pagePath?: string | null };
+  /** Imported days this request may merge (core/imports/imported-window.ts). */
+  imported?: ImportedContext | null;
 };
 
 export type BreakdownResult = {
@@ -56,16 +63,27 @@ export const getBreakdown = async (
   const offset = (input.page - 1) * input.limit;
   const pagination = { limit: input.limit, offset };
 
+  // Dimensions are named like imported_stats columns, so the dimension is
+  // what the plan reads; a page or conversion restriction has no imported twin.
+  const imported =
+    input.pagePath || input.conversion ? null : readFor(input.imported, input.dimension, input.filters ?? {});
+  const pageviewInput = {
+    websiteId: input.websiteId,
+    from: input.from,
+    to: input.to,
+    pagination,
+    filters: input.filters,
+    imported,
+  };
   const rows =
-    input.dimension === "page"
+    input.dimension === "page" || input.dimension === "title"
       ? await pageBreakdown(clickhouse, {
-          websiteId: input.websiteId,
-          from: input.from,
-          to: input.to,
-          pagination,
-          filters: input.filters,
+          ...pageviewInput,
+          column: input.dimension === "title" ? "page_title" : "url_path",
         })
-      : await sessionBreakdown(clickhouse, {
+      : input.dimension === "search_term"
+        ? await searchTermBreakdown(clickhouse, pageviewInput)
+        : await sessionBreakdown(clickhouse, {
           websiteId: input.websiteId,
           from: input.from,
           to: input.to,
@@ -74,6 +92,7 @@ export const getBreakdown = async (
           filters: input.filters,
           pagePath: input.pagePath,
           conversion: input.conversion,
+          imported,
         });
 
   const totalVisitors = rows[0]?.total_visitors ?? 0;

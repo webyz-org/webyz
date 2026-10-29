@@ -27,6 +27,10 @@ const COLUMNS: Array<{
   { key: "sessions", label: "Sessions", sort: "sessions", align: "right" },
   { key: "bounce", label: "Bounce", sort: "bounce_rate", align: "right" },
   { key: "duration", label: "Duration", sort: "duration", align: "right" },
+  // From the tracker's engagement reports (and imported history that has
+  // them); empty for a page no visit reported engagement on.
+  { key: "scroll", label: "Scroll depth", sort: "scroll_depth", align: "right" },
+  { key: "time", label: "Time on page", sort: "time_on_page", align: "right" },
   // Webyz does not track revenue yet; the column renders an empty value
   // rather than inventing numbers, and is not sortable for the same reason.
   { key: "revenue", label: "Revenue", align: "right" },
@@ -205,6 +209,12 @@ export default function PagesTable({
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">
                       {formatDuration(entry.avg_duration)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">
+                      {entry.scroll_depth === null ? "-" : formatPercent(entry.scroll_depth)}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">
+                      {entry.time_on_page === null ? "-" : formatDuration(entry.time_on_page)}
                     </td>
                     <td className="px-4 py-2.5 text-right text-text-muted">
                       —

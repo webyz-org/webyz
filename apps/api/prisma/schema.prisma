@@ -164,6 +164,8 @@ model Website {
   trafficAlert  TrafficAlert?
   members       WebsiteMember[]
   invitations   WebsiteInvitation[]
+  imports       SiteImport[]
+  exports       SiteExport[]
 
   @@index([userId])
   @@index([isBlocked])
@@ -735,4 +737,90 @@ model WebsiteInvitation {
   @@unique([websiteId, email])
   @@index([expiresAt])
   @@map("website_invitations")
+}
+
+/// One import of another tool's history into a site (Google Analytics 4 for
+/// now). The daily aggregates themselves live in ClickHouse `imported_stats`
+/// under this row's id; this row tracks the job and what the dashboard merges.
+model SiteImport {
+  id        String @id @default(uuid())
+  websiteId String @map("website_id")
+  // Who started it; kept null when that account is gone.
+  createdById String? @map("created_by_id")
+
+  source       String @default("ga4")
+  propertyId   String @map("property_id")
+  propertyName String? @map("property_name")
+
+  // Inclusive local dates. endDate is clipped to the day before the site's
+  // first native session, so imported and tracked days never overlap.
+  startDate DateTime @map("start_date") @db.Date
+  endDate   DateTime @map("end_date") @db.Date
+
+  status SiteImportStatus @default(PENDING)
+
+  // "ga4" or "plausible". For GA4: the AES-256-GCM encrypted Google refresh
+  // token (analytics.readonly), held only while the job runs and cleared (and
+  // revoked) when it ends either way. Plausible imports are uploads and hold
+  // no credential.
+  refreshToken String? @map("refresh_token") @db.Text
+
+  stepsDone    Int      @default(0) @map("steps_done")
+  stepsTotal   Int      @default(0) @map("steps_total")
+  rowsImported Int      @default(0) @map("rows_imported")
+  // Uploaded file chunks already written ("<file>#<index>"), so a retried
+  // upload of the same chunk is not counted twice (file imports only).
+  chunksDone   String[] @default([]) @map("chunks_done")
+  // Reports the property could not serve (a dimension Google did not offer).
+  skipped      String[] @default([])
+  error        String?  @db.Text
+
+  // Bumped while running; a RUNNING row with a stale heartbeat was abandoned
+  // by a restart and is picked up again.
+  heartbeatAt DateTime? @map("heartbeat_at") @db.Timestamptz(6)
+  startedAt   DateTime? @map("started_at") @db.Timestamptz(6)
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId])
+  @@index([status])
+  @@map("site_imports")
+}
+
+enum SiteImportStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+/// One prepared "Export data" zip of a site, Plausible-style: built in the
+/// background into EXPORTS_DIR, downloadable for EXPORT_TTL_DAYS, then
+/// deleted with its file. One per site; a new export replaces the old one.
+model SiteExport {
+  id          String           @id @default(uuid())
+  websiteId   String           @map("website_id")
+  // Who asked, emailed when it is ready; null once that account is gone.
+  requestedById String?        @map("requested_by_id")
+  filename    String
+  status      SiteExportStatus @default(RUNNING)
+  sizeBytes   BigInt?          @map("size_bytes")
+  error       String?          @db.Text
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt DateTime?        @map("completed_at") @db.Timestamptz(6)
+  expiresAt   DateTime?        @map("expires_at") @db.Timestamptz(6)
+
+  website Website @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@index([websiteId])
+  @@index([status])
+  @@map("site_exports")
+}
+
+enum SiteExportStatus {
+  RUNNING
+  COMPLETED
+  FAILED
 }

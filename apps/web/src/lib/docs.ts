@@ -12,6 +12,7 @@ export const GUIDES = [
   { slug: "self-hosting", file: "self-hosting.md", title: "Self-hosting", blurb: "Requirements, configuration, Caddy or nginx, first deploy, updates and backups." },
   { slug: "configuration", file: "configuration.md", title: "Configuration", blurb: "Every environment variable for the API, the dashboard and this site." },
   { slug: "tracker", file: "tracker.md", title: "Tracker", blurb: "Installing the script, its options, custom events, single-page apps, opt-out and what is collected." },
+  { slug: "importing", file: "importing.md", title: "Importing your history", blurb: "Bring a site's history from Google Analytics 4 or Plausible: what comes across, what does not, and how it merges." },
   { slug: "api", file: "api.md", title: "HTTP API", blurb: "Authentication with API keys, every endpoint, periods and filters, CSV export, errors and rate limits." },
   { slug: "development", file: "development.md", title: "Development", blurb: "Running Webyz locally, tests, project layout and conventions." },
   { slug: "architecture", file: "architecture.md", title: "Architecture", blurb: "How an event travels from the script to the dashboard, and why the data model looks the way it does." },

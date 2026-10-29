@@ -25,6 +25,11 @@ export type BreakdownTab = {
    * because the tab's own renderer describes a different dimension.
    */
   renderDrilledName?: (row: BreakdownRow) => React.ReactNode;
+  /**
+   * Rows are searches, not visits: the detailed views show a Searches count
+   * (the API's `pageviews`) instead of views, bounce and duration.
+   */
+  searches?: boolean;
 };
 
 /**
@@ -103,6 +108,18 @@ export default function BreakdownCard({
         render: (row) => formatCount(row.visitors),
       },
     ];
+
+    if (tab.searches) {
+      if (view !== "summary") {
+        columns.push({
+          key: "pageviews",
+          label: "Searches",
+          className: "w-20 text-right",
+          render: (row) => (row.pageviews === undefined ? "-" : formatCount(row.pageviews)),
+        });
+      }
+      return columns;
+    }
 
     if (view !== "summary") {
       columns.push(

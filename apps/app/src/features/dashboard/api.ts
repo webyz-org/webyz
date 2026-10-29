@@ -57,6 +57,9 @@ export const EXPORT_GROUPS: { label: string; items: { key: string; label: string
       { key: "top-pages", label: "Top pages" },
       { key: "entries", label: "Entry pages" },
       { key: "exits", label: "Exit pages" },
+      { key: "titles", label: "Page titles" },
+      { key: "search-terms", label: "Site search terms" },
+      { key: "hostnames", label: "Hostnames" },
     ],
   },
   {
@@ -134,8 +137,12 @@ export const downloadExport = async (scope: AnalyticsScope, dataset: string): Pr
   URL.revokeObjectURL(url);
 };
 
-export const getTopStats = (scope: AnalyticsScope) =>
-  get<TopStatsResponse>(`/${scope.siteId}/top-stats`, scopeParams(scope));
+/** `imported` comes from the envelope meta: whether imported history is in the numbers. */
+export const getTopStats = async (scope: AnalyticsScope): Promise<TopStatsResponse> => {
+  const res = await getPaged<TopStatsResponse>(`/${scope.siteId}/top-stats`, scopeParams(scope));
+  const imported = (res.meta as { imported?: TopStatsResponse["imported"] }).imported;
+  return { ...res.data, ...(imported ? { imported } : {}) };
+};
 
 export const getMainGraph = (
   scope: AnalyticsScope,

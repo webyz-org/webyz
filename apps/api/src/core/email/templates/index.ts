@@ -628,3 +628,23 @@ export const trafficSpikeEmail = (
       `<p style="margin:0;font-size:12px;color:#9ca3af"><a href="${data.manageUrl}" style="color:#6b7280">Manage these emails</a></p>`,
   ),
 });
+
+export const exportReadyEmail = (
+  to: string,
+  data: { domain: string; filename: string; settingsUrl: string; days: number },
+): EmailMessage => ({
+  to,
+  subject: `Your Webyz export of ${data.domain} is ready`,
+  text: [
+    `The export of ${data.domain} you asked for is ready: ${data.filename}.`,
+    "",
+    `Download it from the site's settings within ${data.days} days, after which it is deleted:`,
+    data.settingsUrl,
+  ].join("\n"),
+  html: layout(
+    "Your export is ready",
+    paragraph(`The export of <strong>${data.domain}</strong> you asked for is ready: ${data.filename}.`) +
+      paragraph(`Download it from the site's settings within ${data.days} days, after which it is deleted.`) +
+      button(data.settingsUrl, "Go to the download"),
+  ),
+});

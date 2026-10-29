@@ -116,9 +116,10 @@ test("delete: removes the row and everything under it, purges ClickHouse, leaves
   assert.equal(await prisma.apiKey.count({ where: { id: key.id } }), 0);
   assert.equal(await prisma.subscription.count({ where: { userId: user.id } }), 0);
 
-  // events, sessions, event_data, hourly_aggregates, each by website_id.
-  assert.equal(ch.commands.length, 4);
+  // events, sessions, event_data, hourly_aggregates and imported_stats, each by website_id.
+  assert.equal(ch.commands.length, 5);
   assert.ok(ch.commands.every((q) => q.includes("DELETE WHERE website_id")));
+  assert.ok(ch.commands.some((q) => q.includes("imported_stats")));
 
   const tomb = await prisma.deletedAccount.findUnique({ where: { emailHash: hashEmail(user.email) } });
   assert.ok(tomb);

@@ -46,4 +46,6 @@ yarn.lock
 /src/generated/prisma
 
 /geo
+# Prepared "Export data" zips (EXPORTS_DIR default)
+/exports
 /lists-seed

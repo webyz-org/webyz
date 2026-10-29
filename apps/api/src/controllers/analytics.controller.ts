@@ -3,7 +3,14 @@ import { FastifyReply, FastifyRequest } from "fastify";
 import { sendResponse } from "../http/helper/send-response.js";
 import { normalizePagination } from "../http/normalize/pagination.js";
 import { resolveRetainedWindow, retentionMeta, type RetainedWindow } from "../core/billing/entitlements/retention.js";
-import { getBreakdown } from "../core/analytics/breakdown.service.js";
+import { getBreakdown, type BreakdownDimension } from "../core/analytics/breakdown.service.js";
+import {
+  applyImported,
+  importedStatus,
+  resolveImportedAccess,
+  type ImportedApplied,
+} from "../core/imports/imported-window.js";
+import { importedLinkBase, importedLinkSource } from "../db/clickhouse/outbound.js";
 import { getTopStats } from "../core/analytics/top-stats.service.js";
 import { getMainGraph } from "../core/analytics/main-graph.service.js";
 import { getRealtime } from "../core/analytics/realtime.service.js";
@@ -39,7 +46,6 @@ import { badRequest } from "../errors/http-errors.js";
 import { siteAccessDenied } from "../errors/domain-errors.js";
 import { CORS_ORIGINS } from "../config/env.js";
 import { countDrops } from "../core/bots/drops.js";
-import type { SessionDimension } from "../db/clickhouse/breakdown.js";
 import {
   FILTER_KEYS,
   parseFilterValue,
@@ -129,16 +135,43 @@ const resolveWindow = (request: FastifyRequest): Promise<RetainedWindow> => {
 };
 
 /**
+ * Imported history this request may merge: the site's imported days inside
+ * the window, with the request's filters for each report to plan against
+ * (core/imports/imported-plan.ts). `meta.imported` then reports, per report,
+ * whether imported days are in the numbers or why not.
+ */
+const importedAccess = (request: FastifyRequest) =>
+  resolveImportedAccess(request.ctx, {
+    siteId: request.website.id,
+    disabled: (request.query as { with_imported?: string }).with_imported === "false",
+  });
+
+/** `meta.imported` for one report (`dimension`, null for totals and the graph). */
+const importedMeta = (applied: ImportedApplied, dimension: string | null) => {
+  const status = importedStatus(applied, dimension);
+  return status ? { imported: status } : {};
+};
+
+/** applyImported for the request's own window, the common case. */
+const importedForWindow = async (
+  request: FastifyRequest,
+  range: { from: number; to: number },
+  filters: AnalyticsFilters,
+) => applyImported(await importedAccess(request), range.from, range.to, request.website.timezone, filters);
+
+/**
  * One handler for every dimension breakdown. Each route binds a dimension, so
  * adding a breakdown is a single line in the route table rather than another
  * near-identical controller.
  */
 export const breakdownController =
-  (dimension: SessionDimension | "page") =>
+  (dimension: BreakdownDimension) =>
   async (request: FastifyRequest, reply: FastifyReply) => {
     const query = request.query as AnalyticsQuery;
     const { limit, page } = normalizePagination(query);
     const range = await resolveWindow(request);
+    const filters = await requestFilters(request);
+    const imported = await importedForWindow(request, range, filters);
 
     const data = await getBreakdown(request.ctx, {
       websiteId: request.website.id,
@@ -148,10 +181,13 @@ export const breakdownController =
       limit,
       page,
       detailed: query.detailed === "true",
-      filters: await requestFilters(request),
+      filters,
+      imported: imported.context,
     });
 
-    return sendResponse(reply, data.results, { meta: { ...data.meta, ...retentionMeta(range) } });
+    return sendResponse(reply, data.results, {
+      meta: { ...data.meta, ...retentionMeta(range), ...importedMeta(imported, dimension) },
+    });
   };
 
 export const getTopStatsController = async (
@@ -168,13 +204,19 @@ export const getTopStatsController = async (
   const compareFrom = Math.max(range.from - span, range.retention.floor, 0);
   const compareTo = Math.max(range.from, compareFrom);
 
+  const filters = await requestFilters(request);
+  const access = await importedAccess(request);
+  const current = applyImported(access, range.from, range.to, request.website.timezone, filters);
+  const comparison = applyImported(access, compareFrom, compareTo, request.website.timezone, filters);
+
   const stats = await getTopStats(request.ctx, {
     websiteId: request.website.id,
     from: range.from,
     to: range.to,
     compareFrom,
     compareTo,
-    filters: await requestFilters(request),
+    filters,
+    imported: { current: current.context, comparison: comparison.context },
   });
 
   return sendResponse(reply, {
@@ -183,7 +225,7 @@ export const getTopStatsController = async (
     comparing_from: compareFrom,
     comparing_to: compareTo,
     top_stats: stats,
-  }, { meta: retentionMeta(range) });
+  }, { meta: { ...retentionMeta(range), ...importedMeta(current.context || current.off ? current : comparison, null) } });
 };
 
 export const getMainGraphController = async (
@@ -193,6 +235,9 @@ export const getMainGraphController = async (
   const query = request.query as AnalyticsQuery;
   const range = await resolveWindow(request);
 
+  const filters = await requestFilters(request);
+  const imported = await importedForWindow(request, range, filters);
+
   const data = await getMainGraph(request.ctx, {
     websiteId: request.website.id,
     from: range.from,
@@ -200,10 +245,11 @@ export const getMainGraphController = async (
     metric: query.metric || "visitors",
     interval: query.interval || "hour",
     timezone: request.website.timezone,
-    filters: await requestFilters(request),
+    filters,
+    imported: imported.context,
   });
 
-  return sendResponse(reply, data, { meta: retentionMeta(range) });
+  return sendResponse(reply, data, { meta: { ...retentionMeta(range), ...importedMeta(imported, null) } });
 };
 
 export const getRealtimeController = async (
@@ -219,15 +265,20 @@ export const getConversionsController = async (
   reply: FastifyReply,
 ) => {
   const range = await resolveWindow(request);
+  const filters = await requestFilters(request);
+  const imported = await importedForWindow(request, range, filters);
 
   const data = await getConversions(request.ctx, {
     websiteId: request.website.id,
     from: range.from,
     to: range.to,
-    filters: await requestFilters(request),
+    filters,
+    imported: imported.context,
   });
 
-  return sendResponse(reply, data.results, { meta: { ...data.meta, ...retentionMeta(range) } });
+  return sendResponse(reply, data.results, {
+    meta: { ...data.meta, ...retentionMeta(range), ...importedMeta(imported, "event") },
+  });
 };
 
 // ─── Export ──────────────────────────────────────────────────────────────────
@@ -253,13 +304,16 @@ export const exportController = async (request: FastifyRequest, reply: FastifyRe
   }
 
   const range = await resolveWindow(request);
+  const filters = await requestFilters(request);
+  const imported = await importedForWindow(request, range, filters);
   const table = await getExportTable(request.ctx, {
     websiteId: request.website.id,
     dataset,
     from: range.from,
     to: range.to,
     timezone: request.website.timezone,
-    filters: await requestFilters(request),
+    filters,
+    imported: imported.context,
   });
 
   const site = request.website;
@@ -424,6 +478,8 @@ const PAGES_SORTS: readonly PagesSortKey[] = [
   "visitors",
   "bounce_rate",
   "duration",
+  "scroll_depth",
+  "time_on_page",
   "trend",
 ];
 
@@ -444,6 +500,12 @@ export const getPagesController = async (
     : "views";
   const order = query.order === "asc" ? "asc" : "desc";
 
+  // The Pages report takes no drill-down filters; compare like pages.service does.
+  const span = range.to - range.from;
+  const access = await importedAccess(request);
+  const current = applyImported(access, range.from, range.to, request.website.timezone, {});
+  const comparison = applyImported(access, range.from - span, range.from, request.website.timezone, {});
+
   const data = await getPages(request.ctx, {
     websiteId: request.website.id,
     timezone: request.website.timezone,
@@ -454,10 +516,13 @@ export const getPagesController = async (
     order,
     limit,
     page,
+    imported: { current: current.context, comparison: comparison.context },
   });
 
   const { meta, ...rest } = data;
-  return sendResponse(reply, rest, { meta: { ...meta, ...retentionMeta(range) } });
+  return sendResponse(reply, rest, {
+    meta: { ...meta, ...retentionMeta(range), ...importedMeta(current.context || current.off ? current : comparison, "page") },
+  });
 };
 
 export const getPageDetailController = async (
@@ -470,15 +535,21 @@ export const getPageDetailController = async (
   const path = query.path?.slice(0, 1000);
   if (!path) throw badRequest("path is required");
 
+  const span = range.to - range.from;
+  const access = await importedAccess(request);
+  const current = applyImported(access, range.from, range.to, request.website.timezone, {});
+  const comparison = applyImported(access, range.from - span, range.from, request.website.timezone, {});
+
   const data = await getPageDetail(request.ctx, {
     websiteId: request.website.id,
     timezone: request.website.timezone,
     path,
     from: range.from,
     to: range.to,
+    imported: { current: current.context, comparison: comparison.context },
   });
 
-  return sendResponse(reply, data, { meta: retentionMeta(range) });
+  return sendResponse(reply, data, { meta: { ...retentionMeta(range), ...importedMeta(current, "page") } });
 };
 
 /**
@@ -528,6 +599,9 @@ export const getOutboundLinksController = async (
     throw badRequest(`by must be one of ${OUTBOUND_GROUPS.join(", ")}`, { by });
   }
 
+  const filters = await requestFilters(request);
+  const imported = await importedForWindow(request, range, filters);
+
   const data = await getOutboundLinks(request.ctx, {
     websiteId: request.website.id,
     from: range.from,
@@ -536,10 +610,14 @@ export const getOutboundLinksController = async (
     by,
     limit,
     page,
-    filters: await requestFilters(request),
+    filters,
+    imported: imported.context,
   });
 
-  return sendResponse(reply, data.results, { meta: { ...data.meta, ...retentionMeta(range) } });
+  const linkColumn = importedLinkSource(resolveLinkKind(query), by)?.column;
+  return sendResponse(reply, data.results, {
+    meta: { ...data.meta, ...retentionMeta(range), ...(linkColumn ? importedMeta(imported, linkColumn) : {}) },
+  });
 };
 
 /** Totals for the Outbound links page, with the preceding window for change. */
@@ -554,17 +632,28 @@ export const getOutboundSummaryController = async (
   const compareFrom = Math.max(range.from - span, range.retention.floor, 0);
   const compareTo = Math.max(range.from, compareFrom);
 
+  const filters = await requestFilters(request);
+  const access = await importedAccess(request);
+  const current = applyImported(access, range.from, range.to, request.website.timezone, filters);
+  const comparison = applyImported(access, compareFrom, compareTo, request.website.timezone, filters);
+  const kind = resolveLinkKind(request.query as { kind?: string });
+
   const data = await getOutboundSummary(request.ctx, {
     websiteId: request.website.id,
     from: range.from,
     to: range.to,
     compareFrom,
     compareTo,
-    kind: resolveLinkKind(request.query as { kind?: string }),
-    filters: await requestFilters(request),
+    kind,
+    filters,
+    imported: { current: current.context, comparison: comparison.context },
   });
 
-  return sendResponse(reply, { from: range.from, to: range.to, comparing_from: compareFrom, comparing_to: compareTo, ...data }, { meta: retentionMeta(range) });
+  return sendResponse(
+    reply,
+    { from: range.from, to: range.to, comparing_from: compareFrom, comparing_to: compareTo, ...data },
+    { meta: { ...retentionMeta(range), ...importedMeta(current.context || current.off ? current : comparison, importedLinkBase(kind)) } },
+  );
 };
 
 /** Outbound clicks over time, for the page's trend chart. */
@@ -575,6 +664,9 @@ export const getOutboundTimeseriesController = async (
   const query = request.query as AnalyticsQuery & { kind?: string };
   const range = await resolveWindow(request);
 
+  const filters = await requestFilters(request);
+  const imported = await importedForWindow(request, range, filters);
+
   const data = await getOutboundTimeseries(request.ctx, {
     websiteId: request.website.id,
     from: range.from,
@@ -582,10 +674,13 @@ export const getOutboundTimeseriesController = async (
     kind: resolveLinkKind(query),
     interval: query.interval || "day",
     timezone: request.website.timezone,
-    filters: await requestFilters(request),
+    filters,
+    imported: imported.context,
   });
 
-  return sendResponse(reply, data, { meta: retentionMeta(range) });
+  return sendResponse(reply, data, {
+    meta: { ...retentionMeta(range), ...importedMeta(imported, importedLinkBase(resolveLinkKind(query))) },
+  });
 };
 
 export const getCustomEventsController = async (
@@ -596,15 +691,19 @@ export const getCustomEventsController = async (
   const { limit } = normalizePagination(query);
   const range = await resolveWindow(request);
 
+  const filters = await requestFilters(request);
+  const imported = await importedForWindow(request, range, filters);
+
   const data = await getCustomEvents(request.ctx, {
     websiteId: request.website.id,
     from: range.from,
     to: range.to,
     limit,
-    filters: await requestFilters(request),
+    filters,
+    imported: imported.context,
   });
 
-  return sendResponse(reply, data.results, { meta: retentionMeta(range) });
+  return sendResponse(reply, data.results, { meta: { ...retentionMeta(range), ...importedMeta(imported, "event") } });
 };
 
 /**

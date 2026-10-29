@@ -61,10 +61,17 @@ There is no SMTP transport. `SMTP_URL` is read but unused; contributions welcome
 
 | Variable | Notes |
 | --- | --- |
-| `ENCRYPTION_KEY` | 64 hex characters (`openssl rand -hex 32`). Encrypts the Search Console refresh token at rest with AES-256-GCM. Required in production when Search Console is enabled; `setup.sh` generates it. Changing it makes existing connections unreadable until sites reconnect |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth client for Google sign-in and Search Console. Both empty means both features are off and the login page shows no Google button |
+| `ENCRYPTION_KEY` | 64 hex characters (`openssl rand -hex 32`). Encrypts the Search Console and Google Analytics import refresh tokens at rest with AES-256-GCM. Required in production when Search Console is enabled; `setup.sh` generates it. Changing it makes existing connections unreadable until sites reconnect |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth client for Google sign-in, Search Console and Google Analytics import. Both empty means all three are off and the login page shows no Google button |
 | `GOOGLE_REDIRECT_URI` | `https://api.example.com/api/v1/users/auth/google/callback`; register it in the Google Cloud console |
 | `GSC_REDIRECT_URI` | Defaults to the login redirect's origin plus `/api/v1/gsc/callback`; register it too and enable the Search Console API on the project |
+| `GA4_IMPORT_REDIRECT_URI` | Google Analytics import. Defaults to the login redirect's origin plus `/api/v1/imports/ga4/callback`; register it on the same OAuth client and enable the **Google Analytics Admin API** and **Google Analytics Data API** on the project. The import asks for the `analytics.readonly` scope, which Google classes as sensitive: until the OAuth consent screen is verified, only accounts listed as test users can connect |
+
+### Exports
+
+| Variable | Notes |
+| --- | --- |
+| `EXPORTS_DIR` | Where prepared **Export data** zips are kept until they expire, seven days after they are ready. Defaults to `exports` in the API's working directory, which the compose stack mounts as the `exports` volume so a file survives a redeploy |
 
 ### Billing
 

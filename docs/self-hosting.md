@@ -83,7 +83,7 @@ Skip the bundled Caddy and publish the two services on the loopback interface fo
 docker compose -f docker-compose.yml -f docker-compose.expose.yml up -d
 ```
 
-That puts the API on `127.0.0.1:3042` and the dashboard on `127.0.0.1:3041` (change with `API_PORT` and `APP_PORT` in `.env`). Route `/api/*`, `/js/*` and `/health*` to the API and everything else to the dashboard, terminate TLS in your proxy, and pass `X-Forwarded-For` and `X-Forwarded-Proto`. `reverse-proxy/nginx.conf.example` is a complete nginx configuration including the unbuffered realtime stream. Keep `TRUST_PROXY=1` for one proxy; set it to `2` or to your proxies' addresses if more than one sits in front.
+That puts the API on `127.0.0.1:3042` and the dashboard on `127.0.0.1:3041` (change with `API_PORT` and `APP_PORT` in `.env`). Route `/api/*`, `/js/*` and `/health*` to the API and everything else to the dashboard, terminate TLS in your proxy, and pass `X-Forwarded-For` and `X-Forwarded-Proto`. `reverse-proxy/nginx.conf.example` is a complete nginx configuration including the unbuffered realtime stream. Keep `TRUST_PROXY=1` for one proxy; set it to `2` or to your proxies' addresses if more than one sits in front. Allow request bodies of 2 MB on `/api/v1/websites/*/imports/*` so CSV imports can upload; every other API route can stay at a small cap. The example config has the location.
 
 If your proxy is itself a container, attach it to the stack's network instead of exposing ports: `docker network connect webyz_edge <your-proxy>`, then use `webyz-api:3042` and `webyz-app:8080` as upstreams.
 
@@ -92,9 +92,10 @@ If your proxy is itself a container, attach it to the stack's network instead of
 - **Logs**: `docker compose logs -f api`. The API logs JSON in production.
 - **Health**: `/health` is liveness, `/health/ready` checks Postgres, ClickHouse and Redis. Point uptime monitoring at `/health/ready`.
 - **Backups**: see "Backup and restore" below. Nothing in the stack backs up for you.
-- **Jobs**: usage sync, quota enforcement, trial expiry, token purge and the geo update run inside the API process on timers with Redis locks. One API container is the expected shape.
+- **Jobs**: usage sync, quota enforcement, trial expiry, token purge, data imports and export cleanup, and the geo update run inside the API process on timers with Redis locks. One API container is the expected shape.
 - **Geo database**: downloaded into the `geodata` volume by the weekly `update-geo` job once `MAXMIND_LICENSE_KEY` is set. The job runs five minutes after the API starts and then every seven days, so the first breakdowns appear a few minutes after a restart with the key set.
 - **Certificates**: Caddy keeps them in the `caddy_data` volume and renews automatically. Keep that volume across upgrades.
+- **Exports**: prepared Export data zips live in the `exports` volume (`EXPORTS_DIR`) for seven days; the `site-imports` job deletes expired ones.
 
 ## Backup and restore
 

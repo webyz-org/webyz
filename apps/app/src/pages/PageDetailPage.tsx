@@ -173,6 +173,14 @@ export default function PageDetailPage() {
     { label: "Unique visitors", value: formatCount(stats?.visitors ?? 0) },
     { label: "Bounce rate", value: formatPercent(stats?.bounce_rate ?? 0) },
     { label: "Avg. duration", value: formatDuration(stats?.avg_duration ?? 0) },
+    {
+      label: "Scroll depth",
+      value: stats?.scroll_depth == null ? "-" : formatPercent(stats.scroll_depth),
+    },
+    {
+      label: "Time on page",
+      value: stats?.time_on_page == null ? "-" : formatDuration(stats.time_on_page),
+    },
   ];
 
   return (

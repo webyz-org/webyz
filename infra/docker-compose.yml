@@ -54,6 +54,8 @@ x-api-env: &api-env
   GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
   GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
   GOOGLE_REDIRECT_URI: ${BASE_URL}/api/v1/users/auth/google/callback
+  # Google Analytics import callback; empty means the login redirect's origin plus /api/v1/imports/ga4/callback.
+  GA4_IMPORT_REDIRECT_URI: ${GA4_IMPORT_REDIRECT_URI:-}
   PADDLE_API_KEY: ${PADDLE_API_KEY:-}
   PADDLE_CLIENT_TOKEN: ${PADDLE_CLIENT_TOKEN:-}
   PADDLE_WEBHOOK_SECRET: ${PADDLE_WEBHOOK_SECRET:-}
@@ -156,6 +158,8 @@ services:
     volumes:
       # MaxMind database, downloaded by the update-geo job when the key is set.
       - geodata:/repo/apps/api/geo
+      # Prepared "Export data" zips, kept seven days.
+      - exports:/repo/apps/api/exports
     networks: [internal, edge]
     depends_on:
       migrate: { condition: service_completed_successfully }
@@ -183,3 +187,4 @@ volumes:
   chdata:
   redisdata:
   geodata:
+  exports:

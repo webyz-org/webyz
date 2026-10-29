@@ -1,10 +1,15 @@
 import { topStatsQuery } from "../../db/clickhouse/top-stats.js";
+import { importedTotalsQuery } from "../../db/clickhouse/imported.js";
 import { AppContext } from "../../lib/context.js";
+import { readFor, type ImportedContext } from "../imports/imported-window.js";
 import { TopStatsInput } from "./types.js";
 
 export const getTopStats = async (
   { clickhouse }: AppContext,
-  input: TopStatsInput,
+  input: TopStatsInput & {
+    /** Imported days each window may merge (core/imports/imported-window.ts). */
+    imported?: { current: ImportedContext | null; comparison: ImportedContext | null };
+  },
 ) => {
   const row = await topStatsQuery(
     clickhouse,
@@ -18,20 +23,38 @@ export const getTopStats = async (
 
   if (!row) return null;
 
-  const currVisitors = Number(row.visitors || 0);
-  const prevVisitors = Number(row.prev_visitors || 0);
+  // Imported days are disjoint from tracked ones, so their totals add.
+  // Duration is an average, so it merges through total seconds.
+  // Planned for site totals under the request's filters: a filter within one
+  // import family ("country is India") reads that family's rows.
+  const [impCurr, impPrev] = await importedTotalsQuery(clickhouse, input.websiteId, [
+    readFor(input.imported?.current, null),
+    readFor(input.imported?.comparison, null),
+  ]);
 
-  const currVisits = Number(row.visits || 0);
-  const prevVisits = Number(row.prev_visits || 0);
+  const nativeCurrVisits = Number(row.visits || 0);
+  const nativePrevVisits = Number(row.prev_visits || 0);
 
-  const currPageviews = Number(row.pageviews || 0);
-  const prevPageviews = Number(row.prev_pageviews || 0);
+  const currVisitors = Number(row.visitors || 0) + impCurr.visitors;
+  const prevVisitors = Number(row.prev_visitors || 0) + impPrev.visitors;
 
-  const currDuration = Number(row.visit_duration || 0);
-  const prevDuration = Number(row.prev_visit_duration || 0);
+  const currVisits = nativeCurrVisits + impCurr.visits;
+  const prevVisits = nativePrevVisits + impPrev.visits;
 
-  const currBounces = Number(row.bounces || 0);
-  const prevBounces = Number(row.prev_bounces || 0);
+  const currPageviews = Number(row.pageviews || 0) + impCurr.pageviews;
+  const prevPageviews = Number(row.prev_pageviews || 0) + impPrev.pageviews;
+
+  // Rates divide by visits that carry bounces and seconds: imported page and
+  // event rows add visits but neither (imported-plan.ts RATE_NEUTRAL_FAMILIES).
+  const currRateVisits = nativeCurrVisits + impCurr.rate_visits;
+  const prevRateVisits = nativePrevVisits + impPrev.rate_visits;
+  const mergedDuration = (nativeAvg: number, nativeVisits: number, importedSeconds: number, rateVisits: number) =>
+    rateVisits ? ((nativeAvg || 0) * nativeVisits + importedSeconds) / rateVisits : 0;
+  const currDuration = mergedDuration(Number(row.visit_duration || 0), nativeCurrVisits, impCurr.visit_duration, currRateVisits);
+  const prevDuration = mergedDuration(Number(row.prev_visit_duration || 0), nativePrevVisits, impPrev.visit_duration, prevRateVisits);
+
+  const currBounces = Number(row.bounces || 0) + impCurr.bounces;
+  const prevBounces = Number(row.prev_bounces || 0) + impPrev.bounces;
 
   const calcChange = (curr: number, prev: number) => {
     if (prev === 0 && curr === 0) return 0;
@@ -42,8 +65,8 @@ export const getTopStats = async (
   const viewsPerVisit = currVisits ? currPageviews / currVisits : 0;
   const prevViewsPerVisit = prevVisits ? prevPageviews / prevVisits : 0;
 
-  const bounceRate = currVisits ? (currBounces / currVisits) * 100 : 0;
-  const prevBounceRate = prevVisits ? (prevBounces / prevVisits) * 100 : 0;
+  const bounceRate = currRateVisits ? (currBounces / currRateVisits) * 100 : 0;
+  const prevBounceRate = prevRateVisits ? (prevBounces / prevRateVisits) * 100 : 0;
 
   return [
     {

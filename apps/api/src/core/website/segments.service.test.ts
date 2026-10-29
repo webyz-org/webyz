@@ -52,7 +52,7 @@ test("validateSegmentFilters rejects anything that is not a non-empty object", (
 });
 
 test("validateSegmentFilters rejects unknown keys", () => {
-  rejects(() => validateSegmentFilters({ hostname: "x" }), "BAD_REQUEST", "Unknown filter key");
+  rejects(() => validateSegmentFilters({ referrer_path: "x" }), "BAD_REQUEST", "Unknown filter key");
   rejects(() => validateSegmentFilters({ browser: "Chrome", __proto__x: "y" }), "BAD_REQUEST", "Unknown filter key");
 });
 

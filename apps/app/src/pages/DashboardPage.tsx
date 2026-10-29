@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import OverviewSurface from "../features/dashboard/components/OverviewSurface";
 import FilteredTrafficNote from "../features/dashboard/components/FilteredTrafficNote";
+import ImportedDataNote from "../features/dashboard/components/ImportedDataNote";
 import ContentsCard from "../features/dashboard/components/ContentsCard";
 import TechnologyCard from "../features/dashboard/components/TechnologyCard";
 import AcquisitionCard from "../features/dashboard/components/AcquisitionCard";
@@ -214,6 +215,7 @@ export default function DashboardPage() {
         detailsHref={`${base}/pages?${periodQuery(period, from, to)}`}
       />
       <FilteredTrafficNote scope={scope} />
+      <ImportedDataNote scope={scope} />
 
       {/* Key breakdowns: pages carry the most detail, so they get the wider
           column; sources sit beside them. */}

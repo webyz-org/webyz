@@ -1,4 +1,6 @@
 import { AppContext } from "../../lib/context.js";
+import { importedGroupsQuery, importedTotalsQuery } from "../../db/clickhouse/imported.js";
+import { readFor, type ImportedContext } from "../imports/imported-window.js";
 import { AnalyticsFilters } from "../../db/clickhouse/filters.js";
 import {
   customEventNamesQuery,
@@ -73,6 +75,8 @@ export const getConversions = async (
     from: number;
     to: number;
     filters?: AnalyticsFilters;
+    /** Imported days: event goals read imported events, page goals imported pages. */
+    imported?: ImportedContext | null;
   },
 ) => {
   const goals = await listGoals(ctx, input.websiteId);
@@ -88,7 +92,12 @@ export const getConversions = async (
     .map((g) => g.pagePath)
     .filter((p): p is string => Boolean(p));
 
-  const [matches, totalVisitors] = await Promise.all([
+  // Each half is planned on its own: an event goal reads the events family,
+  // a page goal the pages family, each under the request's filters when they
+  // belong to that family; the denominator is the planned site total.
+  const eventsRead = readFor(input.imported, "event");
+  const pagesRead = readFor(input.imported, "page");
+  const [matches, nativeVisitors, importedEvents, importedPages, [importedTotals]] = await Promise.all([
     goalMatchesQuery(ctx.clickhouse, {
       websiteId: input.websiteId,
       from: input.from,
@@ -103,10 +112,22 @@ export const getConversions = async (
       to: input.to,
       filters: input.filters,
     }),
+    eventsRead
+      ? importedGroupsQuery(ctx.clickhouse, { websiteId: input.websiteId, read: eventsRead, nameExpr: "event", names: eventNames })
+      : [],
+    pagesRead
+      ? importedGroupsQuery(ctx.clickhouse, { websiteId: input.websiteId, read: pagesRead, nameExpr: "page", names: pagePaths })
+      : [],
+    importedTotalsQuery(ctx.clickhouse, input.websiteId, [readFor(input.imported, null)]),
   ]);
+  const totalVisitors = nativeVisitors + importedTotals.visitors;
 
   const byEvent = new Map<string, { visitors: number; completions: number }>();
   const byPage = new Map<string, { visitors: number; completions: number }>();
+
+  // A page goal's completions are its pageviews, as for tracked data.
+  for (const row of importedEvents) byEvent.set(row.name, { visitors: row.visitors, completions: row.events });
+  for (const row of importedPages) byPage.set(row.name, { visitors: row.visitors, completions: row.pageviews });
 
   for (const row of matches) {
     const target = row.event_type === "event" ? byEvent : byPage;
@@ -254,17 +275,35 @@ export const getCustomEvents = async (
     to: number;
     limit: number;
     filters?: AnalyticsFilters;
+    imported?: ImportedContext | null;
   },
 ) => {
-  const rows = await customEventNamesQuery(clickhouse, input);
-  const total = rows.reduce((sum, r) => sum + Number(r.visitors), 0);
+  const eventsRead = readFor(input.imported, "event");
+  const [native, imported] = await Promise.all([
+    customEventNamesQuery(clickhouse, input),
+    eventsRead ? importedGroupsQuery(clickhouse, { websiteId: input.websiteId, read: eventsRead, nameExpr: "event" }) : [],
+  ]);
+
+  // Native rows are already capped at `limit`; an event that only exists in
+  // the imported history can still make the cut after the merge.
+  const merged = new Map<string, { visitors: number; completions: number }>();
+  for (const r of native) merged.set(r.name, { visitors: Number(r.visitors), completions: Number(r.completions) });
+  for (const r of imported) {
+    const acc = merged.get(r.name) ?? { visitors: 0, completions: 0 };
+    merged.set(r.name, { visitors: acc.visitors + r.visitors, completions: acc.completions + r.events });
+  }
+  const rows = [...merged]
+    .map(([name, v]) => ({ name, ...v }))
+    .sort((a, b) => b.visitors - a.visitors || a.name.localeCompare(b.name))
+    .slice(0, input.limit);
+  const total = rows.reduce((sum, r) => sum + r.visitors, 0);
 
   return {
     results: rows.map((r) => ({
       name: r.name,
-      visitors: Number(r.visitors),
-      completions: Number(r.completions),
-      percentage: calculatePercentage(Number(r.visitors), total),
+      visitors: r.visitors,
+      completions: r.completions,
+      percentage: calculatePercentage(r.visitors, total),
     })),
   };
 };

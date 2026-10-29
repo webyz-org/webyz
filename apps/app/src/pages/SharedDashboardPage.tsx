@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Lock } from "lucide-react";
 
 import OverviewSurface from "../features/dashboard/components/OverviewSurface";
+import ImportedDataNote from "../features/dashboard/components/ImportedDataNote";
 import ContentsCard from "../features/dashboard/components/ContentsCard";
 import TechnologyCard from "../features/dashboard/components/TechnologyCard";
 import AcquisitionCard from "../features/dashboard/components/AcquisitionCard";
@@ -217,6 +218,7 @@ export default function SharedDashboardPage() {
         <FilterBar />
 
         <OverviewSurface scope={scope} />
+        <ImportedDataNote scope={scope} />
 
         <div className="mt-6 grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <ContentsCard scope={scope} />

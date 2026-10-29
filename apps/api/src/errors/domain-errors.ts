@@ -114,3 +114,63 @@ export const invitationEmailMismatch = (email: string) =>
     code: "INVITATION_EMAIL_MISMATCH",
     statusCode: 403,
   });
+
+// ─── Imports ──────────────────────────────────────────────────────────────────
+
+export const importNotConfigured = () =>
+  createAppError("Google Analytics import is not configured on this server", {
+    code: "IMPORT_NOT_CONFIGURED",
+    statusCode: 501,
+  });
+
+export const importNotConnected = () =>
+  createAppError("Connect a Google account first. The connection lasts an hour; connect again if it has expired.", {
+    code: "IMPORT_NOT_CONNECTED",
+    statusCode: 409,
+  });
+
+export const importReauthRequired = () =>
+  createAppError("Google no longer accepts this connection. Connect your Google account again.", {
+    code: "IMPORT_REAUTH_REQUIRED",
+    statusCode: 409,
+  });
+
+export const importLimitReached = (max: number) =>
+  createAppError(`A site can hold up to ${max} imports at a time. Delete one before importing again.`, {
+    code: "IMPORT_LIMIT",
+    statusCode: 409,
+    details: { max },
+  });
+
+export const importOverlaps = (existing: { start: string; end: string }) =>
+  createAppError(
+    `These dates overlap an existing import (${existing.start} to ${existing.end}), and a day can only be imported once. Pick dates outside it, or delete that import first.`,
+    { code: "IMPORT_OVERLAP", statusCode: 409, details: existing },
+  );
+
+export const importNothingToImport = (firstTrackedDay: string) =>
+  createAppError(
+    `Nothing to import in that range: Webyz has tracked this site since ${firstTrackedDay}, and imported days must come before it.`,
+    { code: "IMPORT_EMPTY_RANGE", statusCode: 400, details: { firstTrackedDay } },
+  );
+
+export const importPropertyNotFound = () =>
+  createAppError("That Google Analytics property is not available to the connected account.", {
+    code: "IMPORT_PROPERTY_NOT_FOUND",
+    statusCode: 404,
+  });
+
+export const importNotFound = () =>
+  createAppError("Import not found", { code: "IMPORT_NOT_FOUND", statusCode: 404 });
+
+export const exportEmpty = () =>
+  createAppError("There is no tracked data to export for this site yet.", {
+    code: "EXPORT_EMPTY",
+    statusCode: 404,
+  });
+
+export const exportNotFound = () =>
+  createAppError("That export is not available any more. Start a new one.", {
+    code: "EXPORT_NOT_FOUND",
+    statusCode: 404,
+  });

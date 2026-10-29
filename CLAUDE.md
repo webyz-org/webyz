@@ -235,6 +235,112 @@ in the Google Cloud project. The OAuth exchange and live queries have not run
 against real Google credentials yet; every state the UI can reach without
 them (unconfigured, unconnected, no property, reauth) is exercised.
 
+Google Analytics 4 import (`core/imports/`, `routes/v1/imports.ts`, settings
+section "Imports & exports") copies a GA4 property's daily aggregates into ClickHouse
+`imported_stats` (migration 013: site, import id, date, dimension, name, and
+visitors / visits / pageviews / bounces / total seconds / events). The Postgres
+`SiteImport` row tracks the job. Flow: OAuth with `analytics.readonly` (own
+callback `GA4_IMPORT_REDIRECT_URI`, the login OAuth client) parks the encrypted
+refresh token in Redis for an hour; `startImport` clips the range to the
+property's creation date and to the day before the site's first tracked session
+(`firstTrackedDate`), so imported and tracked days never overlap, then
+`processImport` claims the row with a conditional update, deletes the import's
+rows, runs `runGa4Import` (report specs in `ga4-reports.ts`, Google behind the
+`Ga4Source` seam so tests use a fake) and revokes the grant either way. Up to
+`MAX_IMPORTS` (5) imports per site, GA4 and CSV mixed, never with overlapping
+dates (`assertImportSlot`), so each imported day has one source and the
+dashboard's span (`getImportedWindow`, first to last imported day) is safe; the
+minute-long `site-imports` cron resumes PENDING rows and
+RUNNING rows whose heartbeat went stale. `ga4-reports.ts` is the only place GA4
+values become Webyz labels, written exactly as the breakdowns render them
+(channel via `classifyChannel`, "Edge" -> "Microsoft Edge", "Macintosh" ->
+"macOS", initcap devices, BCP 47 languages), so reads merge with a plain UNION
+on (dimension, name). Not imported on purpose: returning visitors, cohorts and
+first-user attribution (they contradict the daily visitor id), demographics and
+interests (ad profiling), Google Ads dimensions; GA4 has no exit pages.
+
+CSV import in Plausible's format, for a Plausible export or any tool's files
+(`core/imports/plausible-csv.ts` for the format, `csv-import.service.ts`,
+route `POST /websites/:siteId/imports/csv`, source `csv`, dashboard
+`features/imports/csvFiles.ts`; format documented in `docs/importing.md#csv-format`)
+writes into the same table, with no credential and no job: the browser unpacks
+a zip if given one (Plausible writes it uncompressed; deflate goes through
+`DecompressionStream`; zip64 is parsed but Plausible's exporter does not turn it
+on) and PUTs each CSV as raw `text/csv` chunks of at most 240,000 characters,
+each with the header row and ending on a record outside quotes, because the
+hosted proxy caps request bodies at 1 MB. Each chunk is parsed, mapped and
+inserted on arrival; `chunksDone` makes a retry idempotent; `complete` flips it
+to COMPLETED; the `site-imports` cron fails uploads silent for an hour and drops
+their rows. Column layouts are Plausible's own (`Plausible.Exports`,
+`Plausible.Imported.CSVImporter`, read at commit e8f5220), read by header name
+so older exports import. Regions ("US-CA") and cities (GeoNames ids) are named
+by walking the GeoLite2 search tree once (`geo-names.ts`, about 1.5 s, cached
+for 30 minutes), which yields exactly the labels ingest writes. Plausible's own `engagement` and `pageleave` events appear in its
+custom events export and are skipped (`PLAUSIBLE_INTERNAL_EVENTS`); a real
+export (nihaln.com, 5 Oct 2026) had 46 of them. Custom properties and the path prop of Plausible's own events are stored
+(family `props`) but not yet shown.
+
+`imported_stats` keeps one row per day, report family and attribute
+combination (families and columns in `core/imports/imported-plan.ts`
+`IMPORT_FAMILIES`), so a source row keeps its UTM fields and a country row its
+region and city, as Plausible's own imported tables do. `planImported(dimension,
+filters)` picks the family that answers a report under its filters, or none
+when they span two families; that is Plausible's `decide_tables` rule. Page,
+event, search and props rows are rate-neutral (`RATE_NEUTRAL_FAMILIES`): they
+add visits but no bounces or seconds, and every rate divides by `rate_visits`
+so they do not dilute it (Plausible zeroes imported page bounce and duration
+the same way). Hostname filters imported pages but never groups them.
+
+Version labels are major.minor for every source (`utils/version.ts`
+`shortVersion`; `VERSION_SQL`, `BROWSER_VERSION_SPEC`, `OS_VERSION_SPEC` in
+`db/clickhouse/filters.ts` apply it to tracked rows at read time, and
+`version.test.ts` checks the two agree against ClickHouse). Version filter
+values are cut the same way so older links still match. Keep any new source's
+versions on that rule or its rows split from tracked ones.
+
+Export data (`core/imports/site-export.service.ts`, `db/clickhouse/site-export.ts`,
+`/websites/:siteId/exports` routes, dashboard `ExportSettings`) follows
+Plausible's flow: Export to CSV prepares the zip in the background, one
+`SiteExport` row per site (a new request replaces the last), the file written
+to `EXPORTS_DIR/<id>.zip.part` and renamed when complete, an email to the
+requester, downloadable for 7 days, deletable. `cleanupSiteExports` in the
+minute `site-imports` job deletes expired files, fails a RUNNING row older
+than an hour (a restart mid-build) and removes orphan files. `EXPORTS_DIR` is
+the `exports` volume in `infra/docker-compose.yml`; the hosted overlay
+inherits it. The content is the site's tracked history as Plausible's import
+CSVs, one ClickHouse query per file streamed as CSVWithNames into
+`utils/zip-stream.ts` (stored entries, data descriptors, `zlib.crc32`, no
+zip64), so the zip imports back into Webyz or Plausible. Locations go through JS to turn names
+into ISO 3166-2 codes and GeoNames ids (`geo-names.ts` reverse maps); an
+uncoded region goes out as its name, which `regionName` in `plausible-csv.ts`
+reads back. Owner or admin, any plan, cut to retention, tracked data only.
+Exporting test.com and importing the zip into an empty site reproduced every
+report; the format's one inherent loss is event visitors per link.
+
+Reads merge through `core/imports/imported-window.ts`: `applyImported` turns a
+request window and its filters into an `ImportedContext`, each report calls
+`readFor(context, dimension)` for its planned read (null when no family
+answers), and `importedStatus` reports `included` / `excluded_filters` / `off`
+in `meta.imported`. `db/clickhouse/imported.ts` `importedWhere` turns a planned
+read into SQL. Merging happens in top-stats (totals per window, rates over
+`rate_visits`), the main graph (day, week and month buckets only, via
+`timeseriesComponentsQuery`), every breakdown (`mergedTail` in
+`db/clickhouse/breakdown.ts` unions native raw parts with imported rows before
+paging), the Pages report (list, summary, sparklines and page detail, merged
+before sorting), conversions, custom events, the outbound report (breakdown,
+totals, trend; no page grouping) and the CSV export. The Pages report and page
+detail show scroll depth and time on page from the `engagements` table
+(Plausible's definitions: average of each visit's deepest scroll; engaged
+seconds per visit with engagement), plus imported engagement parts. Imported visitors
+over a range are a sum of daily visitors, so they overcount repeat visitors;
+that is inherent to aggregates and documented in `docs/api.md`.
+
+Three reports added alongside it, live as well as imported: page titles
+(`pageBreakdown` with `column: "page_title"`), hostnames (session dimension),
+and site search terms (`searchTermBreakdown`, terms read from `url_query` by
+`SEARCH_TERM_EXPR` in `filters.ts` over `SEARCH_PARAMS`), each with a filter
+(`title`, `hostname`, `search_term`).
+
 ## API architecture
 
 Layered, one direction only: `routes` -> `controllers` -> `core/<domain>/*.service` -> `db/clickhouse/*` or Prisma.
@@ -265,7 +371,7 @@ Errors go through `registerErrorHandler` (`src/plugins/error-handler.ts`): `{ su
 
 Auth is cookie-session based, not JWT. `SESSION_COOKIE_NAME` is `webyz_session`; `plugins/auth.plugin.ts` validates it against the Postgres `sessions` table (Redis-cached for 5 minutes) and sets `request.session`. Protect a route with `preHandler: [fastify.authenticate]`.
 
-Account self-service (`core/auth/account.service.ts`): `GET /api/v1/users/me/export` returns the account's data as one JSON attachment (profile, sites with goals and funnels, subscriptions, sessions, API key metadata, provider invoices; analytics are pointed at the per-site CSV export, not inlined). `DELETE /api/v1/users/me` needs the password for password accounts, cancels every provider-backed subscription immediately through `BillingProvider.cancelNow` and aborts with 502 `SUBSCRIPTION_CANCEL_FAILED` if the provider refuses (an account must never vanish while a card is still billed), purges ClickHouse for every site via `db/clickhouse/website.ts` `purgeWebsiteAnalytics` (events, sessions, event_data, hourly_aggregates), writes a `deleted_accounts` tombstone (email hash, trial and paid facts) that `startTrial` checks so delete-and-re-register cannot mint another trial, clears caches, then deletes the user row and lets Postgres cascade. The dashboard page is `/settings/account`, which also hosts change password.
+Account self-service (`core/auth/account.service.ts`): `GET /api/v1/users/me/export` returns the account's data as one JSON attachment (profile, sites with goals and funnels, subscriptions, sessions, API key metadata, provider invoices; analytics are pointed at the per-site CSV export, not inlined). `DELETE /api/v1/users/me` needs the password for password accounts, cancels every provider-backed subscription immediately through `BillingProvider.cancelNow` and aborts with 502 `SUBSCRIPTION_CANCEL_FAILED` if the provider refuses (an account must never vanish while a card is still billed), purges ClickHouse for every site via `db/clickhouse/website.ts` `purgeWebsiteAnalytics` (events, sessions, event_data, hourly_aggregates, imported_stats), writes a `deleted_accounts` tombstone (email hash, trial and paid facts) that `startTrial` checks so delete-and-re-register cannot mint another trial, clears caches, then deletes the user row and lets Postgres cascade. The dashboard page is `/settings/account`, which also hosts change password.
 
 The same plugin also accepts `Authorization: Bearer wbz_...` personal API keys (`core/auth/api-keys.service.ts`): only the SHA-256 of a token is stored, the token is shown once at creation, and a key resolves to the same `request.session` shape as a cookie with `request.auth.kind === "api_key"`. Keys are **read-only**: any method other than GET or HEAD is refused with 403 `API_KEY_READ_ONLY` before the handler runs. The plan's `api_access` entitlement is checked on creation and on every use, so a downgrade switches keys off. Management routes are `GET/POST /api/v1/api-keys` and `DELETE /api/v1/api-keys/:keyId`; the dashboard page is `/settings/api-keys`.
 
@@ -312,7 +418,7 @@ Both routes carry `schemas/tracking.schema.ts`, validated by the tracker plugin'
 5. Normalization (`src/ingest/normalize/normalize-tracking.ts`) does bot rejection (four filters under `core/bots/`, cheapest first, each drop counted per site and reason into the ClickHouse `dropped_events` table by `drops.ts` with `async_insert`, never with the address: `utils/bot-detection.ts`, the `ua-parser-js` bot database plus generic bot words and `HeadlessChrome`; `datacenter-ips.ts`, a sorted-interval match of the client address against `geo/datacenter-ips.txt` minus the allow ranges in `geo/datacenter-ips-allow.txt` (default Apple's iCloud Private Relay egress list: a third of its blocks sit inside the hosting ranges); `referrer-spam.ts`, the Matomo list in `geo/referrer-spam.txt`, matched on the referrer domain and its parents; and `clusters.ts`, Redis flags `bots:cluster:<site>:<screen>|<browser>|<language>` set for 24 hours by the five-minute `detect-scripted-traffic` job when a group of the last hour's sessions has 50+ visits from 20+ visitors, 95%+ bounces and zero engagement, on sites with at least 30 engaged sessions in the window (an absolute count: scripted sessions sit in the denominator of any share, and on the first live site they were 45% of the hour). The three lists are fetched daily by `update-bot-lists` (`list-updater.service.ts`, `scripts/update-bot-lists.ts`) from `DATACENTER_IP_LISTS`, `DATACENTER_IP_ALLOWLISTS` and `REFERRER_SPAM_LISTS`; `list-files.ts` reads the live copy in `geo/` and falls back to `lists-seed/`, written at image build (`BOT_LISTS_DIR`), so every filter works from the first request. `BOT_DATACENTER_FILTER=off` and `BOT_CLUSTER_FILTER=off` switch those two off; a missing file switches a list filter off), visitor identity (above), hostname extraction, URL/UTM/meta parsing, user-agent parsing, and MaxMind geo lookup.
 6. `core/tracker/tracking.service.ts` inserts the event, then for pageviews upserts the session row.
 
-`core/tracker/session.service.ts` writes `sessions` for pageviews and `core/tracker/engagement.service.ts` for engagement reports (`t: "engagement"` with `e` visible milliseconds and `sd` scroll percent, sent by the tracker on hide, blur, pagehide and before an SPA route change): an engagement extends `end_time`/`duration_seconds` to the report time, adds to `engaged_seconds`, maxes `scroll_depth`, writes an `engagements` row, and is dropped when no session exists; it is never inserted into `events`, so it is not billed (`billable.ts`) and not shown as activity. Both writers run under `core/tracker/session-lock.ts`, a per-session Redis lock (2 s TTL, 600 ms wait, proceeds unlocked if Redis is down): a route change sends the old page's engagement and the new pageview together, and two read-modify-write cycles on the same ReplacingMergeTree row lose whichever lands first without it. The tracker's engagement arithmetic is tested by running the real `public/js/script.js` in a fake browser under `node:vm` (`src/ingest/tracker-script.test.ts`). Because that table is a ReplacingMergeTree, "updating" a session re-inserts the whole row with a newer `updated_at`, so **every column must be carried forward explicitly or it is lost on the next pageview**. Attribution (`channel`, `referrer_domain`, `utm_*`) is first touch: computed by `ingest/helpers/channel.ts` when the session is created, then preserved. The `AI Assistants` channel comes from the host list in `ingest/helpers/ai-assistants.ts` (referrer host or assistant-set `utm_source`); the dashboard reads channel through `CHANNEL_SPEC` in `db/clickhouse/filters.ts`, which regroups older Referral / Other Campaign rows with the same list, so a host added there applies backwards and breakdown and filter labels cannot drift.
+`core/tracker/session.service.ts` writes `sessions` for pageviews and `core/tracker/engagement.service.ts` for engagement reports (`t: "engagement"` with `e` visible milliseconds and `sd` scroll percent, sent by the tracker on hide, blur, pagehide and before an SPA route change): an engagement extends `end_time`/`duration_seconds` to the report time, adds to `engaged_seconds`, maxes `scroll_depth`, writes an `engagements` row, and is dropped when no session exists; it is never inserted into `events`, so it is not billed (`billable.ts`) and not shown as activity. Both writers run under `core/tracker/session-lock.ts`, a per-session Redis lock (2 s TTL, 600 ms wait, proceeds unlocked if Redis is down): a route change sends the old page's engagement and the new pageview together, and two read-modify-write cycles on the same ReplacingMergeTree row lose whichever lands first without it. The tracker's engagement arithmetic is tested by running the real `public/js/script.js` in a fake browser under `node:vm` (`src/ingest/tracker-script.test.ts`). Because that table is a ReplacingMergeTree, "updating" a session re-inserts the whole row with a newer `updated_at`, so **every column must be carried forward explicitly or it is lost on the next pageview**. Attribution (`channel`, `referrer_domain`, `utm_*`) is first touch: computed by `ingest/helpers/channel.ts` when the session is created, then preserved. The classifier matches a host by every parent domain and by its registrable domain's name (`domainNames`), so `lm.facebook.com` is Facebook and `google.co.in` Google, but `x.example.com` is not X. The `AI Assistants` channel comes from the host list in `ingest/helpers/ai-assistants.ts` (referrer host or assistant-set `utm_source`); the dashboard reads channel through `CHANNEL_SPEC` in `db/clickhouse/filters.ts`, which regroups older Referral / Other Campaign rows with the same list, so a host added there applies backwards and breakdown and filter labels cannot drift.
 
 Geo data lives in `apps/api/geo/`. `core/geo/geo-loader.service.ts` opens `geo/GeoLite2-City.mmdb` lazily and logs a failure without throwing, so geo silently degrades to empty fields if the DB is missing. `scripts/update-geo.ts` refreshes it with `MAXMIND_LICENSE_KEY`.
 
@@ -323,7 +429,7 @@ Geo data lives in `apps/api/geo/`. `core/geo/geo-loader.service.ts` opens `geo/G
 `apps/api/prisma/schema.prisma`. Generated client is written to `src/generated/prisma` (custom `output`, `prisma-client` generator), so import from `../generated/prisma/client.js`, **not** `@prisma/client`. Regenerate after any schema change. Snake_case column names with `@map` throughout; keep that convention.
 
 Models: `User`, `Session`, `PasswordResetToken`, `ApiKey`, `DeletedAccount`, `Website`, `Goal`, `Funnel`,
-`FunnelStep`, `SearchConsoleConnection`, `Plan`, `Subscription`,
+`FunnelStep`, `SearchConsoleConnection`, `SiteImport`, `Plan`, `Subscription`,
 `BillingPeriodUsage`, `UsageRecord`.
 
 Goals (event or exact page path, XOR) are managed in site settings; funnels
@@ -346,6 +452,7 @@ Database `webyz_analytics`. Migrations are plain SQL in `apps/api/clickhouse/mig
 - `sessions` - **ReplacingMergeTree(updated_at)**, `ORDER BY (website_id, session_id)`. Almost all dashboard metrics come from here, not from `events`. Because rows are versioned, queries must deduplicate: either `FROM sessions FINAL` (used by the per-dimension queries in `db/clickhouse/*.ts`) or `argMax(col, updated_at) ... GROUP BY session_id` (used by `top-stats.ts`). Forgetting this double-counts sessions.
 - `hourly_aggregates` - AggregatingMergeTree fed by `hourly_aggregates_mv` off `sessions`, holding `AggregateFunction` states for visits, pageviews, bounces, duration and `uniqCombined` visitors. Read with the matching `-Merge` combinators.
 - `engagements` - MergeTree, one row per engagement report (website, session, user, timestamp, url_path, engaged_ms, scroll_depth), migration 011 (the session columns are 010), for time-on-page and scroll depth per page.
+- `imported_stats` - MergeTree, migration 013, daily aggregates imported from Google Analytics 4 per (website, import, date, dimension, name); merged into reads, never billed (billing reads `events` only).
 - `dropped_events` - MergeTree with a 400 day TTL, one row per request the bot filters refused (website_id, timestamp, reason), migration 012; read by `GET /:siteId/filtered-traffic` and the dashboard's filtered-traffic line.
 - `event_data` - secondary table. (A `websites` table existed from migration 005 with nothing ever writing to it; migration 008 drops it. Site domain and timezone live in Postgres.)
 
@@ -533,6 +640,7 @@ sitemap and canonical URLs. First deployed
 - In `apps/app/src/index.css` the shadcn `@theme inline` block remaps `--color-primary` (and `--color-accent`, `--color-secondary`, `--color-border`) to the near-black shadcn variables, overriding the brand blue in `@theme static`. `bg-primary`/`text-primary` therefore render black. For brand-colored data-UI (chart, bars, selected states) use the `brand` / `brand-ink` tokens, plus `primary-soft`, which are not remapped. Period-over-period changes use `trend-up` / `trend-down` (theme-aware, the Overview's green and red); `success` / `danger` are for status and errors only. The app palette (bg, surface, text-*, brand) is theme-aware: values live on `:root` and `.dark` and are mapped in `@theme inline`, with the `.dark` class managed by `shared/lib/theme.ts` (persisted toggle, OS default). Chart.js cannot read CSS tokens, so `MainGraph` keeps a per-theme literal palette via `useTheme()`.
 
 - Periods and graph buckets resolve in each site's own `Website.timezone`, carried on `request.website` by the site-access plugin. Do not reintroduce a hardcoded zone.
+- Graph bucket labels (`bucketLabels` in `main-graph.service.ts`) must name the buckets ClickHouse fills: weeks start on Sunday (`toStartOfWeek` mode 0) and months on the 1st. Starting them at the window's first day once left every weekly graph empty.
 - ClickHouse `formatDateTime` uses `%i` for minutes; `%M` is the month name and silently produces labels like `14:August:00`.
 - Health: `GET /health` (liveness, always 200) and `GET /health/ready` (Postgres, ClickHouse and Redis each pinged with a 2 second timeout; 503 if any fails), also mounted under `/api`. Both are exempt from the rate limiter. `src/http/health.ts`; registered in `app.ts`, not autoloaded, so it can live outside the `/api` prefix. Security headers come from `@fastify/helmet` in `app.ts`: a deny-all CSP with `frame-ancestors 'none'`, and `Cross-Origin-Resource-Policy: cross-origin` because customer sites load `/js/script.js` from another origin. HSTS is on in production only.
 - `tsconfig.json` typechecks `src` and `scripts` with `noEmit`; `tsconfig.build.json` is the one that emits `dist` from `src` only. Build with the latter.

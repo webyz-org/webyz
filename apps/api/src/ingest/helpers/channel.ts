@@ -76,19 +76,42 @@ const EMAIL_MEDIUMS = new Set(["email", "e-mail", "e_mail", "newsletter"]);
 const AFFILIATE_MEDIUMS = new Set(["affiliate", "affiliates"]);
 const REFERRAL_MEDIUMS = new Set(["referral", "refer", "link"]);
 
-/** Strip www. and take the registrable-ish label for matching. */
+/** Strip www. and lower-case for matching. */
 const normalizeDomain = (domain: string) =>
   domain.toLowerCase().replace(/^www\./, "");
 
-/** First label of the domain, e.g. "google.co.uk" -> "google". */
-const domainRoot = (domain: string) => normalizeDomain(domain).split(".")[0];
+/** Second-level labels under which a country code sits, as in google.co.uk. */
+const SECOND_LEVEL = new Set(["co", "com", "org", "net", "ac", "gov", "edu", "ne", "or", "go"]);
+
+/**
+ * The names a host is matched by: the host itself and every parent domain
+ * ("lm.facebook.com", "facebook.com"), plus the site's own name for the
+ * registrable domain ("facebook" for facebook.com, "google" for
+ * google.co.uk). Matching only the first label used to file Facebook's and
+ * Instagram's link redirects (lm.facebook.com, l.instagram.com) and
+ * images.google.com as Referral. The site name is only taken from the
+ * registrable domain, so a host like x.example.com never reads as X.
+ */
+const domainNames = (domain: string): string[] => {
+  const labels = normalizeDomain(domain).split(".").filter(Boolean);
+  const names: string[] = [];
+  for (let i = 0; i < labels.length - 1; i++) {
+    const suffix = labels.slice(i);
+    names.push(suffix.join("."));
+    const registrable =
+      suffix.length === 2 || (suffix.length === 3 && SECOND_LEVEL.has(suffix[1]) && suffix[2].length === 2);
+    if (registrable) names.push(suffix[0]);
+  }
+  // A bare name with no dot, as a utm_source often is ("google", "facebook").
+  if (labels.length === 1) names.push(labels[0]);
+  return names;
+};
 
 const isSearchEngine = (domain: string) =>
-  SEARCH_ENGINES.has(domainRoot(domain));
+  domainNames(domain).some((name) => SEARCH_ENGINES.has(name));
 
 const isSocialNetwork = (domain: string) =>
-  SOCIAL_NETWORKS.has(normalizeDomain(domain)) ||
-  SOCIAL_NETWORKS.has(domainRoot(domain));
+  domainNames(domain).some((name) => SOCIAL_NETWORKS.has(name));
 
 export type ChannelInput = {
   utmMedium?: string;

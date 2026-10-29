@@ -68,6 +68,10 @@ Three things every site wants counted need no code beyond an attribute on the sc
 
 A link that already carries `data-analytics-event` sends only that event, never two.
 
+## Site search
+
+Nothing to install. A pageview whose URL carries a search parameter is read as a search of your site: the first non-empty of `q`, `s`, `search`, `query`, `keyword`, `keywords` and `term` is the term (WordPress uses `s`, most search boxes `q`). The dashboard's Contents card lists the terms under Site search with visitors and searches, and the `search_term` filter narrows any view to the sessions that searched for one. If your site uses one of those parameters for something other than search, its values will show up there too.
+
 ## Single-page apps
 
 The script wraps `history.pushState` and `replaceState` and listens to `popstate`, so route changes count as pageviews without any code. Apps that route on the URL fragment (`/#/settings`) set `data-hash-routing="true"`, which also counts `hashchange` and keeps the fragment in the recorded path. A pageview for the same URL twice in a row is ignored. To record one manually:

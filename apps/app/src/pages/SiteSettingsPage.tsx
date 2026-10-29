@@ -4,6 +4,7 @@ import {
   Bell,
   Eye,
   Filter,
+  History,
   Puzzle,
   Rocket,
   Target,
@@ -17,6 +18,8 @@ import DangerZoneSettings from "../features/websites/components/settings/DangerZ
 import GoalSettings from "../features/conversions/components/GoalSettings";
 import FunnelSettings from "../features/conversions/components/FunnelSettings";
 import SearchConsoleSettings from "../features/search-console/components/SearchConsoleSettings";
+import ImportSettings from "../features/imports/components/ImportSettings";
+import ExportSettings from "../features/imports/components/ExportSettings";
 import FeatureGate from "../features/billing/components/FeatureGate";
 import NotificationSettings from "../features/notifications/components/NotificationSettings";
 import TeamSettings from "../features/team/components/TeamSettings";
@@ -28,6 +31,7 @@ const SECTIONS = [
   { key: "goals", label: "Goals", icon: Target },
   { key: "funnels", label: "Funnels", icon: Filter },
   { key: "integrations", label: "Integrations", icon: Puzzle },
+  { key: "imports", label: "Imports & exports", icon: History },
   { key: "notifications", label: "Notifications", icon: Bell },
   { key: "visibility", label: "Visibility", icon: Eye },
   { key: "people", label: "People", icon: Users },
@@ -55,7 +59,11 @@ export default function SiteSettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const sectionParam = searchParams.get("section") as SectionKey | null;
   // A GSC callback without an explicit section still belongs on Integrations.
-  const fallback: SectionKey = searchParams.get("gsc") ? "integrations" : "general";
+  const fallback: SectionKey = searchParams.get("gsc")
+    ? "integrations"
+    : searchParams.get("ga4")
+      ? "imports"
+      : "general";
   // Viewers manage nothing, so their only section is People; admins manage
   // everything but the site's existence.
   const role = site?.role ?? "owner";
@@ -165,6 +173,12 @@ export default function SiteSettingsPage() {
             >
               <SearchConsoleSettings siteId={site.id} domain={site.domain} />
             </FeatureGate>
+          )}
+          {section === "imports" && (
+            <div className="space-y-6">
+              <ImportSettings siteId={site.id} domain={site.domain} />
+              <ExportSettings siteId={site.id} domain={site.domain} timezone={site.timezone} />
+            </div>
           )}
           {section === "notifications" && <NotificationSettings site={site} />}
           {section === "visibility" && <VisibilitySettings site={site} />}

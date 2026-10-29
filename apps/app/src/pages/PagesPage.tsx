@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
-import { Search } from "lucide-react";
+import { History, Search } from "lucide-react";
 
 import PeriodPicker from "../features/dashboard/components/PeriodPicker";
 import RetentionNotice from "../features/billing/components/RetentionNotice";
@@ -144,6 +144,13 @@ export default function PagesPage() {
       <RetentionNotice period={period} from={from} />
 
       <PagesSummary summary={pages.data?.summary} isLoading={pages.isLoading} />
+      {pages.data?.meta.imported === "included" && (
+        <p className="mt-2 flex items-center gap-1.5 px-1 text-[12px] text-text-muted">
+          <History size={13} className="shrink-0" aria-hidden />
+          Includes imported history for the days before Webyz tracking began. Imported pages add views,
+          visits, scroll depth and time on page, not bounces or duration.
+        </p>
+      )}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <label className="relative block w-full max-w-72">

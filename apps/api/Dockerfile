@@ -79,8 +79,9 @@ COPY apps/api/public apps/api/public
 COPY --from=build /repo/apps/api/lists-seed ./apps/api/lists-seed
 
 WORKDIR /repo/apps/api
-# geo/ holds the MaxMind database the update-geo job downloads; mount a volume.
-RUN mkdir -p geo && chown -R node:node /repo/apps/api/geo
+# geo/ holds the MaxMind database the update-geo job downloads, exports/ the
+# prepared "Export data" zips (seven days each); mount a volume on each.
+RUN mkdir -p geo exports && chown -R node:node /repo/apps/api/geo /repo/apps/api/exports
 USER node
 
 EXPOSE 3042

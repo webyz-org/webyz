@@ -20,6 +20,15 @@ export default function ContentsCard({ scope }: { scope: AnalyticsScope }) {
           dimension: "exits",
           valueLabel: "Exit page",
         },
+        { key: "titles", label: "Titles", dimension: "titles", valueLabel: "Page title" },
+        {
+          key: "search_terms",
+          label: "Site search",
+          dimension: "search_terms",
+          valueLabel: "Search term",
+          searches: true,
+        },
+        { key: "hostnames", label: "Hostnames", dimension: "hostnames", valueLabel: "Hostname" },
       ]}
     />
   );

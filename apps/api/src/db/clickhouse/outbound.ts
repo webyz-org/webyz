@@ -9,6 +9,7 @@ import {
   type AnalyticsFilters,
   type LinkEventKind,
 } from "./filters.js";
+import { importedWhere, type ImportedRead } from "./imported.js";
 
 /**
  * How link clicks are grouped: by the destination's host, by the full
@@ -79,6 +80,30 @@ const clicksCte = (input: Window, query_params: Record<string, unknown>): string
       )`;
 };
 
+/**
+ * Where a grouping's imported rows come from: the `events` family column the
+ * plan reads (core/imports/imported-plan.ts) and the expression over it that
+ * yields this grouping's label. GA4 and Plausible report link clicks by URL
+ * only, so nothing feeds the page grouping.
+ */
+export const importedLinkSource = (
+  kind: LinkEventKind,
+  by: OutboundGroup,
+): { column: string; nameExpr: string } | null => {
+  if (kind === "outbound") {
+    if (by === "domain") return { column: "outbound_domain", nameExpr: "outbound_domain" };
+    if (by === "url") return { column: "outbound_url", nameExpr: "outbound_url" };
+    return null;
+  }
+  if (by === "url") return { column: "download", nameExpr: "download" };
+  if (by === "domain") return { column: "download", nameExpr: "domainWithoutWWW(download)" };
+  if (by === "type") return { column: "download", nameExpr: "lower(extract(path(download), '\\.([A-Za-z0-9]+)$'))" };
+  return null;
+};
+
+/** The `events` column whose rows are a kind's clicks. */
+export const importedLinkBase = (kind: LinkEventKind) => (kind === "outbound" ? "outbound_url" : "download");
+
 export type OutboundRow = {
   name: string;
   visitors: number;
@@ -96,6 +121,8 @@ export const outboundBreakdownQuery = async (
   input: Window & {
     by: OutboundGroup;
     pagination: { limit: number; offset: number };
+    /** Planned imported read for this grouping (importedLinkSource). */
+    imported?: ImportedRead | null;
   },
 ): Promise<OutboundRow[]> => {
   const query_params: Record<string, unknown> = {
@@ -104,6 +131,48 @@ export const outboundBreakdownQuery = async (
   };
   const cte = clicksCte(input, query_params);
   const column = GROUP_COLUMN[input.by];
+  const source = input.imported ? importedLinkSource(input.kind ?? "outbound", input.by) : null;
+
+  if (input.imported && source) {
+    const base = importedLinkBase(input.kind ?? "outbound");
+    const where = importedWhere(input.imported, query_params);
+    const result = await clickhouse.query({
+      query: `${cte},
+      merged AS (
+        SELECT name, sum(visitors) AS visitors, sum(clicks) AS clicks
+        FROM (
+          SELECT ${column} AS name, toUInt64(uniqExact(user_id)) AS visitors, toUInt64(count()) AS clicks
+          FROM clicks GROUP BY name
+          UNION ALL
+          SELECT ${source.nameExpr} AS name, toUInt64(sum(visitors)) AS visitors, toUInt64(sum(events)) AS clicks
+          FROM webyz_analytics.imported_stats
+          WHERE ${where} AND ${base} != ''
+          GROUP BY name
+        )
+        WHERE name != ''
+        GROUP BY name
+      ),
+      imported_base AS (
+        SELECT toUInt64(sum(visitors)) AS visitors, toUInt64(sum(events)) AS clicks
+        FROM webyz_analytics.imported_stats
+        WHERE ${where} AND ${base} != ''
+      )
+      SELECT
+        name,
+        toUInt32(visitors) AS visitors,
+        toUInt32(clicks) AS clicks,
+        toUInt32((SELECT uniqExact(user_id) FROM clicks) + (SELECT visitors FROM imported_base)) AS total_visitors,
+        toUInt32((SELECT count() FROM clicks) + (SELECT clicks FROM imported_base)) AS total_clicks,
+        toUInt32((SELECT count() FROM merged)) AS dimension_count
+      FROM merged
+      ORDER BY visitors DESC, clicks DESC, name ASC
+      LIMIT {limit:UInt32} OFFSET {offset:UInt32}
+    `,
+      query_params,
+      format: "JSONEachRow",
+    });
+    return result.json<OutboundRow>();
+  }
 
   const result = await clickhouse.query({
     query: `${cte}
@@ -139,18 +208,35 @@ export type OutboundTotals = {
 /** The window's outbound totals in one row (zeros when there were no clicks). */
 export const outboundTotalsQuery = async (
   clickhouse: ClickHouseClient,
-  input: Window,
+  input: Window & { imported?: ImportedRead | null },
 ): Promise<OutboundTotals> => {
   const query_params: Record<string, unknown> = {};
   const cte = clicksCte(input, query_params);
+  const kind = input.kind ?? "outbound";
+
+  // Imported clicks and visitors add; destinations and URLs are distinct
+  // labels across both sources. Pages stay tracked-only: GA4 does not say
+  // which page a link was clicked on.
+  let importedSql = { clicks: "0", visitors: "0", hosts: "", urls: "" };
+  if (input.imported) {
+    const base = importedLinkBase(kind);
+    const hosts = importedLinkSource(kind, "domain")!;
+    const from = `FROM webyz_analytics.imported_stats WHERE ${importedWhere(input.imported, query_params)} AND ${base} != ''`;
+    importedSql = {
+      clicks: `(SELECT sum(events) ${from})`,
+      visitors: `(SELECT sum(visitors) ${from})`,
+      hosts: `UNION ALL SELECT ${hosts.nameExpr} ${from}`,
+      urls: `UNION ALL SELECT ${base} ${from}`,
+    };
+  }
 
   const result = await clickhouse.query({
     query: `${cte}
       SELECT
-        toUInt32(count()) AS clicks,
-        toUInt32(uniqExact(user_id)) AS visitors,
-        toUInt32(uniqExact(host)) AS destinations,
-        toUInt32(uniqExact(href)) AS urls,
+        toUInt32(count() + ${importedSql.clicks}) AS clicks,
+        toUInt32(uniqExact(user_id) + ${importedSql.visitors}) AS visitors,
+        toUInt32((SELECT uniqExact(h) FROM (SELECT host AS h FROM clicks ${importedSql.hosts}))) AS destinations,
+        toUInt32((SELECT uniqExact(u) FROM (SELECT href AS u FROM clicks ${importedSql.urls}))) AS urls,
         toUInt32(uniqExact(url_path)) AS pages
       FROM clicks
     `,

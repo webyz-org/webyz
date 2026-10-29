@@ -8,7 +8,7 @@ import { ClickHouseClient } from "@clickhouse/client";
  * disappear shortly after this resolves.
  */
 export const purgeWebsiteAnalytics = async (clickhouse: ClickHouseClient, siteId: string) => {
-  const byWebsite = ["events", "sessions", "event_data", "hourly_aggregates"];
+  const byWebsite = ["events", "sessions", "event_data", "hourly_aggregates", "imported_stats"];
   let firstError: unknown = null;
 
   for (const table of byWebsite) {

@@ -47,6 +47,55 @@ export const sortItems = (items: readonly ChangeItem[]): ChangeItem[] =>
 
 export const RELEASES: Release[] = [
   {
+    slug: "import-your-history",
+    date: "2026-10-29",
+    title: "Bring your history with you",
+    summary:
+      "Switching tools used to mean starting from an empty dashboard. Now your Google Analytics 4 or Plausible history comes with you.",
+    items: [
+      {
+        kind: "new",
+        text: "Import from Google Analytics 4: connect your Google account in the site's settings, pick the property, and Webyz copies its daily history across. Access is read-only and revoked the moment the import finishes.",
+      },
+      {
+        kind: "new",
+        text: "Import from CSV: drop in a Plausible export as it is, or any tool's data written in the same CSV format, which the docs describe file by file. Exit pages, regions, cities, outbound links and downloads all come across, labelled the way Webyz labels its own data. A site can hold up to five imports, Google Analytics and CSV mixed, as long as their dates do not overlap.",
+      },
+      {
+        kind: "new",
+        text: "Imported days are added to the overview, the graph, every breakdown, goals, custom events, outbound links and CSV exports, for the dates before Webyz began tracking, so nothing is counted twice. Visits from AI assistants are grouped as their own channel in imported data too.",
+      },
+      {
+        kind: "new",
+        text: "Export data: download your site's tracked history, as far back as your plan keeps it, as one zip of CSVs, in the same format the import reads and Plausible uses, so your data goes wherever you take it. Choose Export to CSV, and we email you when the file is ready. It stays downloadable for seven days and is then deleted, or delete it yourself sooner.",
+      },
+      {
+        kind: "new",
+        text: "Filters work on imported data the way they do in Plausible: when the filter and the report come from the same imported report (a country and its regions, a source and its campaigns), your history stays in the numbers. Only a filter that crosses two reports, like a country on the browsers list, leaves it out, and the dashboard says so.",
+      },
+      {
+        kind: "new",
+        text: "The Pages report shows scroll depth and time on page for every page, sortable, and on each page's detail. Imported history is in the Pages report too, Plausible's scroll depth and time on page included.",
+      },
+      {
+        kind: "new",
+        text: "Three new tabs on the Contents card: page titles, hostnames, and the terms visitors search your site for, read from your search page's URL with nothing to install.",
+      },
+      {
+        kind: "improved",
+        text: "Browser and operating system versions read as major.minor (Chrome 128.0, macOS 14.4), so the same version is one row whether it was tracked or imported. Links and segments that filter on a longer version still work.",
+      },
+      {
+        kind: "fixed",
+        text: "Visits through Facebook's and Instagram's link redirects (lm.facebook.com, l.instagram.com) and from image search on Google were counted as Referral. They now count as Organic Social and Organic Search.",
+      },
+      {
+        kind: "fixed",
+        text: "The weekly and monthly graphs showed zero for periods that did not start on a Sunday or on the 1st. They now show every week and month.",
+      },
+    ],
+  },
+  {
     slug: "ai-assistants-channel",
     date: "2026-09-29",
     title: "Traffic from AI assistants",

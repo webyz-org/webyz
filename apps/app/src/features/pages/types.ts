@@ -5,6 +5,8 @@ export type PagesSortKey =
   | "visitors"
   | "bounce_rate"
   | "duration"
+  | "scroll_depth"
+  | "time_on_page"
   | "trend";
 
 export type PagesSortOrder = "asc" | "desc";
@@ -20,6 +22,10 @@ export type PageEntry = {
   visitors: number;
   bounce_rate: number;
   avg_duration: number;
+  /** Average deepest scroll, percent; null when no visit reported engagement. */
+  scroll_depth: number | null;
+  /** Engaged seconds per visit that reported engagement; null without any. */
+  time_on_page: number | null;
   prev_views: number;
   /** Percent change vs the previous period; meaningless when prev_views is 0. */
   change: number;
@@ -46,6 +52,8 @@ export type PagesResponse = {
     limit: number;
     total_items: number;
     has_more: boolean;
+    /** Imported history is in these numbers ("included"), or absent. */
+    imported?: "included" | "excluded_filters" | "off";
   };
 };
 
@@ -69,6 +77,8 @@ export type PageDetailResponse = {
     entry_sessions: number;
     exit_sessions: number;
     exit_rate: number;
+    scroll_depth: number | null;
+    time_on_page: number | null;
   };
   trend: { labels: string[]; plot: number[]; interval: string };
   sources: BreakdownEntry[];

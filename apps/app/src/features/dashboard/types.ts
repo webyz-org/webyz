@@ -50,6 +50,12 @@ export type TopStatsResponse = {
   comparing_from: number;
   comparing_to: number;
   top_stats: TopStat[] | null;
+  /**
+   * Imported history overlaps the period: "included" in these numbers, or
+   * left out because a filter is applied ("excluded_filters") or on request
+   * ("off"). Absent when no imported day is in range.
+   */
+  imported?: "included" | "excluded_filters" | "off";
 };
 
 /** Requests the ingest bot filters refused in the period, by reason. */
@@ -181,6 +187,9 @@ export const DIMENSIONS = {
   pages: "top-pages",
   entries: "entries",
   exits: "exits",
+  titles: "titles",
+  hostnames: "hostnames",
+  search_terms: "search-terms",
 
   browsers: "browsers",
   browser_versions: "browser-versions",

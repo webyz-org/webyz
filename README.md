@@ -35,12 +35,13 @@ Most sites need one page of numbers: how many people came, from where, what they
 ## Features
 
 - **Overview** of visitors, visits, pageviews, views per visit, bounce rate and visit duration, each compared with the previous period, with a graph at minute, hour, day, week or month resolution.
-- **Breakdowns** by page, entry and exit page, channel (AI assistants such as ChatGPT and Perplexity are a channel of their own), source, UTM parameters, browser, OS, device, screen size, language, country, region and city. Click a row to drill down (browser to versions, country to regions to cities); every filter lives in the URL so a view is a link.
+- **Breakdowns** by page, entry and exit page, page title, hostname, site search term, channel (AI assistants such as ChatGPT and Perplexity are a channel of their own), source, UTM parameters, browser, OS, device, screen size, language, country, region and city. Click a row to drill down (browser to versions, country to regions to cities); every filter lives in the URL so a view is a link.
 - **Filters** with `is`, `is not`, `contains` and `does not contain`, on any dimension plus goals and custom events. Save a set as a **segment** and apply it in one click.
 - **Realtime**: who is on the site right now on a world map, what they are looking at, and a live stream of activity.
 - **Goals, funnels and custom events** from event names or page paths, analysed live in ClickHouse. Custom event **properties** are broken down per value, so "Signup by plan" is two clicks.
 - **Automatic events** from the tracker: outbound link clicks, file downloads and 404 pages, each switched on by one attribute. Single-page apps and hash-based routers are followed without code.
 - **User journeys**: the paths visitors take between pages, with the events they fire along the way.
+- **Import your history** from Google Analytics 4 (connect and pick a property) or CSV files in Plausible's format (a Plausible export as it is, or any tool's data), up to five imports per site, and **export** the whole site as a zip of CSVs in the same format. Imported days are added to every report for the dates before Webyz began tracking, never double counted.
 - **Google Search Console** queries and rankings next to your traffic, pulled live from Google and never stored.
 - **Email reports** every week or month and **traffic spike alerts**, per site.
 - **Public dashboards** by unguessable link, optionally behind a password, embeddable in an iframe.
@@ -89,6 +90,7 @@ Updating is `git pull`, then `docker compose pull && docker compose up -d` in `i
 | [Self-hosting](docs/self-hosting.md) | Install in one command, configuration, updates, your own reverse proxy, backups, troubleshooting |
 | [Configuration](docs/configuration.md) | Every environment variable for the API and the dashboard |
 | [Tracker](docs/tracker.md) | Installing the script, options, custom events, automatic events, SPA routing, opt-out, what is collected |
+| [Importing](docs/importing.md) | Bringing a site's history from Google Analytics 4 or Plausible: what comes across and how it merges |
 | [API](docs/api.md) | Authentication, endpoints, periods and filters, exports, errors, rate limits |
 | [Development](docs/development.md) | Running locally, tests, project layout, conventions, releases |
 | [Architecture](docs/architecture.md) | How events flow from the script to the dashboard, and why the data model looks the way it does |

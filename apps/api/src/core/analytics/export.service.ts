@@ -1,22 +1,26 @@
 import type { AppContext } from "../../lib/context.js";
-import type { SessionDimension } from "../../db/clickhouse/breakdown.js";
+import type { BreakdownDimension } from "./breakdown.service.js";
 import type { AnalyticsFilters } from "../../db/clickhouse/filters.js";
-import { timeseriesQuery, type Interval } from "../../db/clickhouse/timeseries.js";
+import type { Interval } from "../../db/clickhouse/timeseries.js";
 import type { OutboundGroup } from "../../db/clickhouse/outbound.js";
 import type { LinkEventKind } from "../../db/clickhouse/filters.js";
 import { getBreakdown } from "./breakdown.service.js";
 import { getOutboundLinks } from "./outbound.service.js";
-import { bucketLabels, validateInterval } from "./main-graph.service.js";
+import { bucketLabels, getMainGraph, validateInterval } from "./main-graph.service.js";
+import type { ImportedContext } from "../imports/imported-window.js";
 
 /**
  * URL segment -> session dimension, shared by the breakdown routes and the
  * export so the two can never disagree about what "browsers" means. Paths are
  * kept stable because the dashboard already calls them.
  */
-export const BREAKDOWN_SEGMENTS: Record<string, SessionDimension | "page"> = {
+export const BREAKDOWN_SEGMENTS: Record<string, BreakdownDimension> = {
   "top-pages": "page",
   entries: "entry_page",
   exits: "exit_page",
+  titles: "title",
+  hostnames: "hostname",
+  "search-terms": "search_term",
 
   browsers: "browser",
   "browser-versions": "browser_version",
@@ -89,6 +93,8 @@ export type ExportInput = {
   to: number;
   timezone: string;
   filters?: AnalyticsFilters;
+  /** Imported days to include, as on the dashboard. */
+  imported?: ImportedContext | null;
 };
 
 /** Daily buckets unless the window is short enough for hourly ones to be readable. */
@@ -109,6 +115,7 @@ export const getExportTable = async (ctx: AppContext, input: ExportInput): Promi
     page: 1,
     detailed: true,
     filters: input.filters,
+    imported: input.imported,
   });
 
   return {
@@ -140,6 +147,7 @@ const outboundTable = async (ctx: AppContext, input: ExportInput): Promise<Expor
     limit: EXPORT_ROW_LIMIT,
     page: 1,
     filters: input.filters,
+    imported: input.imported,
   });
 
   return {
@@ -154,13 +162,14 @@ const outboundTable = async (ctx: AppContext, input: ExportInput): Promise<Expor
  * joined on the bucket label the labels helper generates, so gaps read as 0
  * just as they do on the chart.
  */
-const timeseriesTable = async ({ clickhouse }: AppContext, input: ExportInput): Promise<ExportTable> => {
+const timeseriesTable = async (ctx: AppContext, input: ExportInput): Promise<ExportTable> => {
   const interval = exportInterval(input.from, input.to);
   const labels = bucketLabels(input.from, input.to, interval, input.timezone);
 
+  // Through the graph service so imported days merge exactly as on the chart.
   const series = await Promise.all(
     TIMESERIES_METRICS.map(async (metric) => {
-      const rows = await timeseriesQuery(clickhouse, {
+      const graph = await getMainGraph(ctx, {
         websiteId: input.websiteId,
         from: input.from,
         to: input.to,
@@ -168,8 +177,9 @@ const timeseriesTable = async ({ clickhouse }: AppContext, input: ExportInput): 
         interval,
         timezone: input.timezone,
         filters: input.filters,
+        imported: input.imported,
       });
-      return new Map(rows.map((r) => [r.t, Number(r.value)]));
+      return new Map(graph.labels.map((label, i) => [label, graph.plot[i]]));
     }),
   );
 

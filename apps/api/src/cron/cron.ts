@@ -13,6 +13,7 @@ import { purgeTokensJob } from "./purge-tokens.job.js";
 import { trialsJob } from "./trials.job.js";
 import { emailReportsJob } from "./email-reports.job.js";
 import { trafficAlertsJob } from "./traffic-alerts.job.js";
+import { siteImportsJob } from "./site-imports.job.js";
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -134,6 +135,17 @@ const jobs = (): Job[] => [
     everyMs: 5 * MINUTE,
     delayMs: 2 * MINUTE,
     run: trafficAlertsJob,
+    enabled: true,
+  },
+  {
+    // Data imports start straight from the request; this picks up any that a
+    // restart interrupted (stale heartbeat) or that never got going. The
+    // claim in processImport keeps two instances off the same import, and the
+    // short lock keeps one instance from overlapping itself on a long run.
+    name: "site-imports",
+    everyMs: MINUTE,
+    delayMs: 45_000,
+    run: siteImportsJob,
     enabled: true,
   },
 ];

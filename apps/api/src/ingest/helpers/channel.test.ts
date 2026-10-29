@@ -31,3 +31,28 @@ describe("classifyChannel: AI assistants", () => {
     assert.equal(classifyChannel({}), "Direct");
   });
 });
+
+describe("classifyChannel: hosts under a network's domain", () => {
+  it("files link redirects and subdomains under the network", () => {
+    assert.equal(classifyChannel({ referrerDomain: "lm.facebook.com" }), "Organic Social");
+    assert.equal(classifyChannel({ referrerDomain: "l.instagram.com" }), "Organic Social");
+    assert.equal(classifyChannel({ referrerDomain: "m.facebook.com" }), "Organic Social");
+    assert.equal(classifyChannel({ referrerDomain: "out.reddit.com" }), "Organic Social");
+    assert.equal(classifyChannel({ referrerDomain: "news.ycombinator.com" }), "Organic Social");
+    assert.equal(classifyChannel({ referrerDomain: "t.co" }), "Organic Social");
+    assert.equal(classifyChannel({ referrerDomain: "images.google.com" }), "Organic Search");
+    assert.equal(classifyChannel({ referrerDomain: "google.co.in" }), "Organic Search");
+    assert.equal(classifyChannel({ referrerDomain: "search.yahoo.co.jp" }), "Organic Search");
+  });
+
+  it("does not read a network's name out of someone else's subdomain", () => {
+    assert.equal(classifyChannel({ referrerDomain: "x.example.com" }), "Referral");
+    assert.equal(classifyChannel({ referrerDomain: "google.example.com" }), "Referral");
+    assert.equal(classifyChannel({ referrerDomain: "facebook-clone.io" }), "Referral");
+  });
+
+  it("still reads bare utm_source names", () => {
+    assert.equal(classifyChannel({ utmSource: "facebook", utmMedium: "post" }), "Organic Social");
+    assert.equal(classifyChannel({ utmSource: "google", utmMedium: "" }), "Organic Search");
+  });
+});

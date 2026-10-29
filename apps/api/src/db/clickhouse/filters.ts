@@ -19,6 +19,7 @@ import {
   AI_ASSISTANT_CHANNEL,
   AI_ASSISTANT_HOSTS,
 } from "../../ingest/helpers/ai-assistants.js";
+import { shortVersionLabel } from "../../utils/version.js";
 
 export type FilterOperator = "is" | "is_not" | "contains" | "not_contains";
 
@@ -57,17 +58,35 @@ type FilterSpec = {
 
 const col = (column: string): FilterSpec => ({ columns: [column], expr: column });
 
+/**
+ * A version column cut to major.minor, the SQL twin of `shortVersion` in
+ * utils/version.ts: the leading digits and at most one more dot part, or the
+ * value unchanged when it does not start with a digit ("Unknown").
+ */
+export const VERSION_SQL = (column: string) =>
+  `if(match(trimBoth(${column}), '^[0-9]'), extract(trimBoth(${column}), '^[0-9]+(?:[.][0-9]+)?'), trimBoth(${column}))`;
+
+/**
+ * "<browser> <major.minor>" and "<os> <major.minor>", as the version
+ * breakdowns render them and imported rows are labelled (utils/version.ts).
+ */
+export const BROWSER_VERSION_SPEC = {
+  columns: ["browser_family", "browser_version"],
+  expr: `concat(browser_family, ' ', ${VERSION_SQL("browser_version")})`,
+};
+export const OS_VERSION_SPEC = {
+  columns: ["os_family", "os_version"],
+  expr: `concat(os_family, ' ', ${VERSION_SQL("os_version")})`,
+};
+
+/** Filter keys whose values are version labels, normalised before matching. */
+const VERSION_FILTER_KEYS = new Set(["browser_version", "os_version"]);
+
 const SESSION_FILTERS = {
   browser: col("browser_family"),
-  browser_version: {
-    columns: ["browser_family", "browser_version"],
-    expr: "concat(browser_family, ' ', browser_version)",
-  },
+  browser_version: BROWSER_VERSION_SPEC,
   os: col("os_family"),
-  os_version: {
-    columns: ["os_family", "os_version"],
-    expr: "concat(os_family, ' ', os_version)",
-  },
+  os_version: OS_VERSION_SPEC,
   // Matches the display expression in breakdown.ts, which folds case.
   device: { columns: ["device_type"], expr: "initcap(lower(device_type))" },
   screen: col("screen"),
@@ -88,6 +107,7 @@ const SESSION_FILTERS = {
   country: col("country"),
   region: col("sub_division_1"),
   city: col("city"),
+  hostname: col("hostname"),
 } satisfies Record<string, FilterSpec>;
 
 export type SessionFilterKey = keyof typeof SESSION_FILTERS;
@@ -148,7 +168,30 @@ const isOutboundKey = (key: string): key is OutboundFilterKey => key in LINK_FIL
  * events table. A `goal` filter from the API is resolved by the controller
  * into `page` or `event` before it gets here.
  */
-export type EventFilterKey = "page" | "event" | OutboundFilterKey;
+/**
+ * Query string parameters read as a site search term, in order: the common
+ * search-box names, WordPress's `s` included. A page view whose URL carries
+ * one is a search; the first non-empty one is the term.
+ */
+export const SEARCH_PARAMS = ["q", "s", "search", "query", "keyword", "keywords", "term"] as const;
+
+/** The site search term of a pageview ('' for none), from `url_query`. */
+export const SEARCH_TERM_EXPR = `trimBoth(decodeURLFormComponent(arrayFirst(x -> x != '', [${SEARCH_PARAMS.map(
+  (p) => `extractURLParameter(concat('?', url_query), '${p}')`,
+).join(", ")}])))`;
+
+/**
+ * Pageview columns filtered like `page`: restrict to sessions with a
+ * pageview whose value matches. The title is what the tab said; the search
+ * term comes from the URL (SEARCH_TERM_EXPR).
+ */
+const PAGEVIEW_FILTERS = {
+  page: "url_path",
+  title: "page_title",
+  search_term: SEARCH_TERM_EXPR,
+} as const;
+
+export type EventFilterKey = keyof typeof PAGEVIEW_FILTERS | "event" | OutboundFilterKey;
 export type FilterKey = SessionFilterKey | EventFilterKey;
 
 export type AnalyticsFilters = Partial<Record<FilterKey, FilterCondition>>;
@@ -156,6 +199,8 @@ export type AnalyticsFilters = Partial<Record<FilterKey, FilterCondition>>;
 export const FILTER_KEYS = [
   ...(Object.keys(SESSION_FILTERS) as SessionFilterKey[]),
   "page",
+  "title",
+  "search_term",
   "event",
   "outbound_domain",
   "outbound_url",
@@ -213,7 +258,7 @@ const isNegative = (op: FilterOperator) => op === "is_not" || op === "not_contai
  * Predicate for `expr <op> {param}`. Substring matches fold case, because a
  * person typing "pricing" means every page with pricing in it.
  */
-const predicate = (expr: string, op: FilterOperator, param: string): string => {
+export const predicate = (expr: string, op: FilterOperator, param: string): string => {
   switch (op) {
     case "is":
       return `${expr} = {${param}:String}`;
@@ -286,10 +331,11 @@ export const buildSessionFilters = (
     const positiveOp: FilterOperator =
       op === "contains" || op === "not_contains" ? "contains" : "is";
 
-    if (key === "page") {
-      queryParams.flt_page = value;
+    if (key in PAGEVIEW_FILTERS) {
+      const param = `flt_${key}`;
+      queryParams[param] = value;
       pageRestriction += eventsRestriction(
-        `event_type = 'pageview' AND ${predicate("url_path", positiveOp, "flt_page")}`,
+        `event_type = 'pageview' AND ${predicate(PAGEVIEW_FILTERS[key as keyof typeof PAGEVIEW_FILTERS], positiveOp, param)}`,
         isNegative(op),
         time,
       );
@@ -324,7 +370,9 @@ export const buildSessionFilters = (
     if (!spec) continue;
 
     const param = `flt_${key}`;
-    queryParams[param] = value;
+    // An exact version label from before the major.minor rule still finds its row.
+    queryParams[param] =
+      VERSION_FILTER_KEYS.has(key) && (op === "is" || op === "is_not") ? shortVersionLabel(value) : value;
     for (const column of spec.columns) columns.add(column);
     clauses.push(predicate(spec.expr, op, param));
   }
