@@ -43,16 +43,41 @@ fi
 echo "starting (migrate runs first)"
 $COMPOSE up -d --remove-orphans
 
+# The API image is Debian-slim with no curl or wget; Node's fetch is there.
+api_ready() {
+  docker exec webyz-api node -e "fetch('http://127.0.0.1:3042/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1
+}
+
 echo "waiting for the API"
 for i in $(seq 1 30); do
-  # The API image is Debian-slim with no curl or wget; Node's fetch is there.
-  if docker exec webyz-api node -e "fetch('http://127.0.0.1:3042/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then
+  if api_ready; then
     echo "api ready"
     break
   fi
   [ "$i" -eq 30 ] && { echo "api not ready after 60s; docker compose logs api" >&2; $COMPOSE ps; exit 1; }
   sleep 2
 done
+
+# One good probe is not proof. A container that is crash-looping is "running",
+# and even "healthy", for a few seconds of every cycle, and the API degrades
+# rather than fails without Redis, so a loop can hide behind `ps` (12 Nov 2026:
+# Redis restarted 89 times on a corrupt append-only file while every container
+# read healthy). So watch the restart counters for a while and probe again.
+WATCH_SECONDS=30
+IDS="$($COMPOSE ps -q)"
+restart_counts() { docker inspect -f '{{.Name}} restarts={{.RestartCount}} running={{.State.Running}}' $IDS 2>&1 | sort; }
+echo "watching for restarts (${WATCH_SECONDS}s)"
+BEFORE="$(restart_counts)"
+sleep "$WATCH_SECONDS"
+AFTER="$(restart_counts)"
+if [ "$BEFORE" != "$AFTER" ] || echo "$AFTER" | grep -q 'running=false'; then
+  echo "a container restarted or stopped during the watch; look at its logs (docker logs <name>):" >&2
+  echo "--- at the start" >&2; echo "$BEFORE" >&2
+  echo "--- ${WATCH_SECONDS}s later" >&2; echo "$AFTER" >&2
+  exit 1
+fi
+api_ready || { echo "api stopped being ready during the watch; docker compose logs api" >&2; $COMPOSE ps; exit 1; }
+echo "stable: no restarts, api still ready"
 
 $COMPOSE ps
 echo "deployed $(git rev-parse --short HEAD)"
