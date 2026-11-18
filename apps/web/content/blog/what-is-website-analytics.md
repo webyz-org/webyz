@@ -163,7 +163,7 @@ The differences between tools are in the details of that middle step, and those 
 
 Some platforms set a cookie, or another persistent identifier, so the same browser can be recognised weeks later. Some derive a temporary identifier on the server and throw away the raw inputs. Some store the visitor's IP address, some never write it down at all.
 
-Webyz takes the second approach for each of those choices. The script is about 6 KB gzipped, sets no cookies and stores nothing in the browser. The visitor identifier is calculated on the server by hashing the address and user agent together with a salt that is regenerated every day and never stored long term, so the same person is one visitor within a day and cannot be linked across days. The IP address is used for the country lookup and is never written to the database.
+Webyz takes the second approach for each of those choices. The script is about 7 KB gzipped, sets no cookies and stores nothing in the browser. The visitor identifier is calculated on the server by hashing the address and user agent together with a salt that is regenerated every day and never stored long term, so the same person is one visitor within a day and cannot be linked across days. The IP address is used for the country lookup and is never written to the database.
 
 That is the useful question to ask any vendor: not only what a tool measures, but what it keeps. We wrote a longer piece on exactly that: [how to track website traffic without tracking users](/blog/track-traffic-without-tracking-users).
 

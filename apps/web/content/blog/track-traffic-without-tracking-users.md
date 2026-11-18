@@ -203,7 +203,7 @@ Putting those questions to everyone else and not to ourselves would be cheap. He
 | Where is it stored? | Our servers for the hosted product, or yours: Webyz is AGPL-3.0 and self-hosting is one script and one compose command, in which case none of it reaches us at all. |
 | Retention? | Set by plan, and it is currently an access rule rather than a delete: reads are cut at the retention boundary, and the underlying rows are not yet purged. Self-hosting gives you the database and therefore the last word. |
 | Export and delete? | CSV export per dataset, a JSON export of everything your account holds, and account deletion that cancels billing and purges your analytics. |
-| Script weight? | About 6 KB gzipped, loaded with `defer`. Do Not Track is honoured by default. |
+| Script weight? | About 7 KB gzipped, loaded with `defer`. Do Not Track is honoured by default. |
 | Methodology? | A visit ends after 30 minutes of inactivity and cannot cross UTC midnight, because the identifier is rebuilt daily. A bounce is one pageview with no custom event. Visit duration is measured from how long the page was actually visible, so a single-page read is not recorded as zero seconds. |
 
 Two of those answers are worse than we would like. Retention hides rather than deletes, and the UTC midnight boundary means a visit that spans it is counted twice. Both are written down here rather than left for you to discover.

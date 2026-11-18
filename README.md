@@ -6,7 +6,7 @@
 
 <p align="center">
   Privacy-first web analytics you can read in a minute and run on your own server.<br>
-  No cookies, no fingerprinting across days, no personal data. A 5 KB script, a Fastify API, ClickHouse for the numbers.
+  No cookies, no fingerprinting across days, no personal data. A 7 KB script, a Fastify API, ClickHouse for the numbers.
 </p>
 
 <p align="center">
@@ -52,7 +52,7 @@ Most sites need one page of numbers: how many people came, from where, what they
 
 ## How it stays private
 
-The tracker sets no cookies and writes nothing to the browser. Visitors are counted on the server with a hash of the site, IP address, user agent and a random salt that changes every day, so the same person is one visitor within a day and unlinkable across days. The IP is used for that hash and a local country lookup, then dropped; it is never stored. Do Not Track is honoured by default and visitors can opt out. The tracker is about 5 KB gzipped and loads with `defer`. The full statement is in [`apps/web/src/app/privacy`](apps/web/src/app/privacy/page.tsx), which is what the hosted service publishes.
+The tracker sets no cookies and writes nothing to the browser. Visitors are counted on the server with a hash of the site, IP address, user agent and a random salt that changes every day, so the same person is one visitor within a day and unlinkable across days. The IP is used for that hash and a local country lookup, then dropped; it is never stored. Do Not Track is honoured by default and visitors can opt out. The tracker is about 7 KB gzipped and loads with `defer`. The full statement is in [`apps/web/src/app/privacy`](apps/web/src/app/privacy/page.tsx), which is what the hosted service publishes.
 
 ## Getting started
 

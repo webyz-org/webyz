@@ -118,7 +118,7 @@ export default function SiteFooter() {
               <code>{SNIPPET}</code>
             </pre>
             <p className="mt-3 text-[12.5px] text-white/50">
-              About 6 KB gzipped. Loads with defer, never blocks the page. Your site ID is on the install screen after
+              About 7 KB gzipped. Loads with defer, never blocks the page. Your site ID is on the install screen after
               you add a website.
             </p>
           </div>

@@ -23,15 +23,16 @@ function Hand({ children, className = "" }: { children: React.ReactNode; classNa
   );
 }
 
-// Measured against apps/api/public/js/script.js on 18 Sep 2026: 6,484 bytes
-// gzipped (5,533 brotli), no cookies or browser storage, 30 minute server-side
-// session window. It said 3,843 bytes and "under 4 KB" from an earlier
-// measurement; engagement reporting, outbound links, file downloads and 404
-// tracking were added to the script after that and nobody re-measured. Re-run
+// Measured against apps/api/public/js/script.js on 18 Nov 2026: 7,611 bytes
+// gzipped (6,513 brotli), no cookies or browser storage, 30 minute server-side
+// session window. It has gone stale twice ("under 4 KB", then "6 KB" from
+// 6,484 bytes on 18 Sep 2026): engagement reporting, outbound links, file
+// downloads and 404 tracking grew the script and nobody re-measured. Re-run
 // `gzip -c apps/api/public/js/script.js | wc -c` when you touch the tracker,
-// and change this line with it.
+// and change this line with it, along with the Developers card below, the
+// footer, README.md, docs/tracker.md and the blog posts that quote the size.
 const FIGURES: [string, string, string][] = [
-  ["About", "6 KB", "script"],
+  ["About", "7 KB", "script"],
   ["Sets", "0", "cookies"],
   ["Session", "30", "min"],
 ];
@@ -45,7 +46,7 @@ const VIEWS = [
 
 const AUDIENCES = [
   { title: "Founders", text: "One page that answers whether the launch worked: visitors, where they came from, what they read and whether they signed up. Six stats above the fold, no configuration, no training." },
-  { title: "Developers", text: "One script tag, 6.3 KB gzipped. Postgres, ClickHouse and Redis under the hood, self-hostable, and a plain data model you can query yourself." },
+  { title: "Developers", text: "One script tag, 7.4 KB gzipped. Postgres, ClickHouse and Redis under the hood, self-hostable, and a plain data model you can query yourself." },
   { title: "Marketers", text: "Channels, sources and UTM breakdowns, with visits from AI assistants such as ChatGPT and Perplexity as a channel of their own, filters that live in the URL so a view is a link, and goals that count the page visits and events that matter." },
   { title: "Teams", text: "Realtime on a shared screen, journeys to settle arguments about where people actually go, and public share links for anyone who needs a look without an account." },
 ];

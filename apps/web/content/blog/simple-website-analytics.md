@@ -158,7 +158,7 @@ Privacy does not have to cost you the answers. Traffic, content performance, sou
 
 ### Performance
 
-An analytics script should not be a tax on the page. Ours is about 6 KB gzipped and loads with `defer`, so it never blocks rendering. Small matters most on the sites where every kilobyte is argued over: blogs, landing pages and shops.
+An analytics script should not be a tax on the page. Ours is about 7 KB gzipped and loads with `defer`, so it never blocks rendering. Small matters most on the sites where every kilobyte is argued over: blogs, landing pages and shops.
 
 ### Honest metrics
 
