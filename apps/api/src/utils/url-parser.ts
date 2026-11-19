@@ -14,10 +14,10 @@ export const parseUrlData = (
   if (url) {
     try {
       const currentUrl = new URL(url, base);
-      urlPath =
-        currentUrl.pathname === "/undefined"
-          ? ""
-          : currentUrl.pathname + currentUrl.hash;
+      // The path is stored as visited, "/undefined" included: a site with a
+      // broken link needs to see that row to find it. It used to be blanked,
+      // which left an unlabelled bar on the dashboard.
+      urlPath = currentUrl.pathname + currentUrl.hash;
       urlQuery = currentUrl.search.substring(1);
     } catch (err) {
       urlPath = url;

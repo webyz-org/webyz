@@ -98,8 +98,9 @@ export default function BreakdownCard({
           // renderer (country flags) would mislabel the rows; a tab can pass
           // renderDrilledName for that level instead.
           (drilled ? tab.renderDrilledName?.(row) : tab.renderName?.(row)) ??
-          row.name ??
-          "(none)",
+          // "||", not "??": rows stored with an empty value (older page rows
+          // from before "/undefined" was kept) would render a blank bar.
+          (row.name || "(none)"),
       },
       {
         key: "visitors",

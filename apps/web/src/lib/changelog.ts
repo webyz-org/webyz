@@ -47,6 +47,23 @@ export const sortItems = (items: readonly ChangeItem[]): ChangeItem[] =>
 
 export const RELEASES: Release[] = [
   {
+    slug: "privacy-and-pages-fixes",
+    date: "2026-11-19",
+    title: "Two fixes: a privacy correction and a blank row",
+    summary:
+      "One of these is a mistake of ours that the privacy policy said could not happen, so it is written up here rather than fixed quietly.",
+    items: [
+      {
+        kind: "fixed",
+        text: "The country lookup kept visitor IP addresses in a server-side cache for up to 30 days. Our privacy policy says an address is used in memory and discarded, and that was not true of this cache. It was never written to the analytics database or shown anywhere. The cache was removed on 12 November and the addresses already in it were deleted; a lookup now lives only in the server's memory.",
+      },
+      {
+        kind: "fixed",
+        text: "A visit to a broken link ending in /undefined showed as a blank row in Pages, Entry pages and Exit pages. It now shows as /undefined, so you can find the link that causes it, and older visits are labelled (none).",
+      },
+    ],
+  },
+  {
     slug: "more-events-on-every-plan",
     date: "2026-10-29",
     title: "More events on every plan",

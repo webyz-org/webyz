@@ -85,7 +85,7 @@ export default function PagesTable({
   const meta = data?.meta;
 
   const displayName = (path: string) =>
-    mode === "url" ? `https://${domain}${path}` : path;
+    mode === "url" ? `https://${domain}${path}` : path || "(none)";
 
   const first = meta ? (meta.page - 1) * meta.limit + 1 : 0;
   const last = meta ? (meta.page - 1) * meta.limit + rows.length : 0;
